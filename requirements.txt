@@ -1,0 +1,9 @@
+numpy
+pillow
+torch
+flask
+flask-socketio
+eventlet
+tensorboard
+pytest
+stable-baselines3
