@@ -3,9 +3,9 @@
 class Sensor {
     constructor(car) {
         this.car = car;
-        this.rayCount = 5;
-        this.rayLength = 250;  // Increased from 150 for longer visible rays
-        this.raySpread = Math.PI / 2;
+        this.rayCount = 11;  // Increased from 5 for better coverage
+        this.rayLength = 350;  // Base length for center ray
+        this.raySpread = Math.PI;  // 180 degrees
         this.rays = [];
         this.readings = [];
     }
@@ -62,11 +62,15 @@ class Sensor {
             );
             
             const rayAngle = this.car.angle + rayOffset;
-
+            
+            // Create parabolic length distribution - center rays longer than side rays
+            const normalizedOffset = Math.abs(rayOffset) / (this.raySpread / 2); // 0 to 1
+            const parabolicLength = this.rayLength * (1 - normalizedOffset * normalizedOffset * 0.6); // Parabolic curve
+            
             const start = { x: this.car.x, y: this.car.y };
             const end = {
-                x: this.car.x + Math.cos(rayAngle) * this.rayLength,
-                y: this.car.y + Math.sin(rayAngle) * this.rayLength
+                x: this.car.x + Math.cos(rayAngle) * parabolicLength,
+                y: this.car.y + Math.sin(rayAngle) * parabolicLength
             };
             this.rays.push([start, end]);
         }
