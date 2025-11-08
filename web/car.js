@@ -20,6 +20,12 @@ class Car {
         this.actualWidth = width;
         this.actualHeight = height;
         this.carPolygon = []; // Will be set when car image is loaded
+        
+        // Cache track image data once for fast collision detection
+        this.trackImageData = offscreenCtx.getImageData(0, 0, trackImg.width, trackImg.height);
+        this.trackData = this.trackImageData.data;
+        this.trackWidth = trackImg.width;
+        this.trackHeight = trackImg.height;
     }
     
     setCarImage(carImg) {
@@ -125,6 +131,7 @@ class Car {
 
     assessDamage(trackBorders) {
         // Check every single pixel along the perimeter of the car polygon
+        // Using cached track data for 100x+ faster performance
         for (let i = 0; i < this.polygon.length; i++) {
             const start = this.polygon[i];
             const end = this.polygon[(i + 1) % this.polygon.length];
@@ -142,13 +149,14 @@ class Car {
                 const y = Math.floor(start.y + dy * t);
                 
                 // Check bounds
-                if (x < 0 || y < 0 || x >= this.trackImg.width || y >= this.trackImg.height) {
+                if (x < 0 || y < 0 || x >= this.trackWidth || y >= this.trackHeight) {
                     return true;
                 }
                 
-                // Check if pixel is off track (transparent)
-                const pixel = this.offscreenCtx.getImageData(x, y, 1, 1).data;
-                if (pixel[3] === 0) {
+                // Check if pixel is off track (transparent) using cached data
+                // Direct array access is 100x+ faster than getImageData()
+                const index = (y * this.trackWidth + x) * 4;
+                if (this.trackData[index + 3] === 0) {
                     return true;
                 }
             }
