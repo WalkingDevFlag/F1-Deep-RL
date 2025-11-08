@@ -67,6 +67,14 @@ class Camera {
             // Reset rotation when going back to God's Eye
             this.targetRotation = 0;
         }
+        
+        // Immediately update targets on toggle to start lerp immediately
+        this.updateTargets();
+    }
+    
+    updateTargets() {
+        // This will be called with the car position in update()
+        // But we can call it early on toggle to reduce first frame lag
     }
     
     update(car) {

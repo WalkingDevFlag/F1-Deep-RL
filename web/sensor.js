@@ -31,7 +31,7 @@ class Sensor {
             const px = Math.floor(start.x + dx * t);
             const py = Math.floor(start.y + dy * t);
             
-            if (px < 0 || py < 0 || px >= this.car.trackImg.width || py >= this.car.trackImg.height) {
+            if (px < 0 || py < 0 || px >= this.car.trackWidth || py >= this.car.trackHeight) {
                 return {
                     x: px,
                     y: py,
@@ -39,8 +39,9 @@ class Sensor {
                 };
             }
             
-            const pixel = this.car.offscreenCtx.getImageData(px, py, 1, 1).data;
-            if (pixel[3] === 0) { // hit track boundary
+            // Use cached track data instead of expensive getImageData()
+            const index = (py * this.car.trackWidth + px) * 4;
+            if (this.car.trackData[index + 3] === 0) { // hit track boundary
                 return {
                     x: px,
                     y: py,

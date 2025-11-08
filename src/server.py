@@ -1,5 +1,6 @@
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, request, jsonify
 import os
+import time
 
 app = Flask(__name__)
 
@@ -17,6 +18,18 @@ def tracks(filename):
 def cars(filename):
     directory = os.path.join(os.path.dirname(__file__), '..', 'cars')
     return send_from_directory(directory, filename)
+
+@app.route('/log_performance', methods=['POST'])
+def log_performance():
+    data = request.get_json()
+    timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
+    
+    log_entry = f"[{timestamp}] FPS: {data.get('fps', 0)}, Update: {data.get('updateTime', 0):.2f}ms, Draw: {data.get('drawTime', 0):.2f}ms, Car: {data.get('carTime', 0):.2f}ms, Sensor: {data.get('sensorTime', 0):.2f}ms, Camera: {data.get('cameraTime', 0):.2f}ms\n"
+    
+    with open('performance.log', 'a') as f:
+        f.write(log_entry)
+    
+    return jsonify({'status': 'logged'})
 
 @app.route('/favicon.ico')
 def favicon():

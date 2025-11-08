@@ -20,18 +20,14 @@ class Renderer {
             this.lastTime = now;
         }
         
-        // Clear canvas with white
+        // Clear canvas with white (single clearRect is most efficient)
         this.ctx.fillStyle = '#ffffff';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
         // Apply camera transformation
         camera.applyTransform(this.ctx, car);
         
-        // Draw background
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.fillRect(0, 0, trackImg.width, trackImg.height);
-        
-        // Draw track
+        // Draw track (no need for background fill, track image covers everything)
         this.ctx.drawImage(trackImg, 0, 0);
         
         // Draw car (which includes sensors)
