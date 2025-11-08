@@ -165,18 +165,19 @@ class Car {
         return false;
     }
 
-    update(keys, trackImg, offscreenCtx, trackBorders) {
+    update(keys, trackImg, offscreenCtx, trackBorders, deltaTime = 0.016) {
         if (!this.damaged) {
             // Handle acceleration and deceleration
+            // Scale acceleration by delta time to make it frame-rate independent
             if (keys['KeyW'] || keys['ArrowUp']) {
-                this.speed = Math.min(this.maxSpeed, this.speed + this.acceleration);
+                this.speed = Math.min(this.maxSpeed, this.speed + this.acceleration * deltaTime * 60);
             } else {
                 this.speed *= this.friction;
             }
             
             // Handle reverse (slower acceleration)
             if (keys['KeyS'] || keys['ArrowDown']) {
-                this.speed = Math.max(-this.maxSpeed / 2, this.speed - this.acceleration / 2);
+                this.speed = Math.max(-this.maxSpeed / 2, this.speed - (this.acceleration / 2) * deltaTime * 60);
             }
             
             // Apply turning (reduce speed slightly when turning)
@@ -185,16 +186,18 @@ class Car {
                 turnSpeed *= 0.9; // Slight speed reduction when turning
             }
             
-            // Calculate movement
+            // Calculate movement using delta time
+            // Speed is in pixels per second, so we multiply by deltaTime to get frame-independent movement
             let moveX = Math.cos(this.angle) * turnSpeed;
             let moveY = Math.sin(this.angle) * turnSpeed;
             
-            // Handle turning
+            // Handle turning (rotate angle based on delta time)
+            // 0.05 radians per 16ms (60 FPS), so scale by delta time
             if (keys['KeyA'] || keys['ArrowLeft']) {
-                this.angle -= 0.05;
+                this.angle -= 0.05 * deltaTime * 60;
             }
             if (keys['KeyD'] || keys['ArrowRight']) {
-                this.angle += 0.05;
+                this.angle += 0.05 * deltaTime * 60;
             }
 
             // Move car

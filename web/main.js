@@ -15,6 +15,8 @@ class Game {
         this.trackImg = null;
         this.carImg = null;
         this.collisionResetTimeout = null;
+        this.lastFrameTime = performance.now();
+        this.deltaTime = 0;
     }
 
     async init() {
@@ -86,12 +88,17 @@ class Game {
     }
 
     update() {
+        // Calculate delta time (in seconds)
+        const currentTime = performance.now();
+        this.deltaTime = (currentTime - this.lastFrameTime) / 1000;
+        this.lastFrameTime = currentTime;
+        
         // Get keyboard input
         const keys = this.controls.getKeys();
 
         // Update car with physics and collision
         const trackBorders = this.track.getBorders();
-        this.car.update(keys, this.trackImg, this.offscreenCtx, trackBorders);
+        this.car.update(keys, this.trackImg, this.offscreenCtx, trackBorders, this.deltaTime);
 
         // Update camera
         this.camera.update(this.car);
