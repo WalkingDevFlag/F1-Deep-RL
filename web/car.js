@@ -19,6 +19,7 @@ class Car {
         this.carImgScale = 0.4; // The scale factor used when drawing the car image
         this.actualWidth = width;
         this.actualHeight = height;
+        this.carPolygon = []; // Will be set when car image is loaded
     }
     
     setCarImage(carImg) {
@@ -26,32 +27,100 @@ class Car {
         if (carImg && carImg.complete && carImg.naturalWidth > 0) {
             this.actualWidth = carImg.width * this.carImgScale;
             this.actualHeight = carImg.height * this.carImgScale;
+            this.carPolygon = this.extractCarPolygon(carImg);
             console.log(`Car actual dimensions: ${this.actualWidth} x ${this.actualHeight}`);
         }
     }
 
-    createPolygon() {
-        // Create car rectangle corners using ACTUAL rendered dimensions
-        const points = [];
-        const halfW = this.actualWidth / 2;
-        const halfH = this.actualHeight / 2;
+    extractCarPolygon(carImg) {
+        // Create a temporary canvas to analyze the image
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = carImg.naturalWidth;
+        canvas.height = carImg.naturalHeight;
+        ctx.drawImage(carImg, 0, 0);
         
-        // Base corners (unrotated)
-        const corners = [
-            { x: -halfW, y: -halfH }, // top-left
-            { x: halfW, y: -halfH },  // top-right
-            { x: halfW, y: halfH },   // bottom-right
-            { x: -halfW, y: halfH }   // bottom-left
-        ];
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
         
-        // Rotate each corner around car center
-        for (const corner of corners) {
-            const rotatedX = this.x + corner.x * Math.cos(this.angle) - corner.y * Math.sin(this.angle);
-            const rotatedY = this.y + corner.x * Math.sin(this.angle) + corner.y * Math.cos(this.angle);
-            points.push({ x: rotatedX, y: rotatedY });
+        // Find all boundary pixels (non-transparent pixels adjacent to transparent ones)
+        const boundaryPixels = [];
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        
+        for (let y = 0; y < canvas.height; y++) {
+            for (let x = 0; x < canvas.width; x++) {
+                const index = (y * canvas.width + x) * 4;
+                if (data[index + 3] > 0) { // non-transparent pixel
+                    // Check if it's a boundary pixel
+                    let isBoundary = false;
+                    for (let dy = -1; dy <= 1 && !isBoundary; dy++) {
+                        for (let dx = -1; dx <= 1 && !isBoundary; dx++) {
+                            if (dx === 0 && dy === 0) continue;
+                            const nx = x + dx;
+                            const ny = y + dy;
+                            if (nx < 0 || ny < 0 || nx >= canvas.width || ny >= canvas.height) {
+                                isBoundary = true;
+                            } else {
+                                const nindex = (ny * canvas.width + nx) * 4;
+                                if (data[nindex + 3] === 0) {
+                                    isBoundary = true;
+                                }
+                            }
+                        }
+                    }
+                    if (isBoundary) {
+                        boundaryPixels.push({ x: x - centerX, y: y - centerY });
+                    }
+                }
+            }
         }
         
-        return points;
+        // Sort boundary pixels by angle from center for proper polygon ordering
+        boundaryPixels.sort((a, b) => {
+            const angleA = Math.atan2(a.y, a.x);
+            const angleB = Math.atan2(b.y, b.x);
+            return angleA - angleB;
+        });
+        
+        // Scale the polygon to match the drawing scale
+        const scale = this.carImgScale;
+        return boundaryPixels.map(p => ({
+            x: p.x * scale,
+            y: p.y * scale
+        }));
+    }
+
+    createPolygon() {
+        // Use the pre-computed car polygon if available, otherwise fall back to rectangle
+        if (this.carPolygon && this.carPolygon.length > 0) {
+            // Rotate the car polygon around the car center
+            return this.carPolygon.map(point => {
+                const rotatedX = this.x + point.x * Math.cos(this.angle) - point.y * Math.sin(this.angle);
+                const rotatedY = this.y + point.x * Math.sin(this.angle) + point.y * Math.cos(this.angle);
+                return { x: rotatedX, y: rotatedY };
+            });
+        } else {
+            // Fallback to rectangle if no car polygon
+            const points = [];
+            const halfW = this.actualWidth / 2;
+            const halfH = this.actualHeight / 2;
+            
+            const corners = [
+                { x: -halfW, y: -halfH },
+                { x: halfW, y: -halfH },
+                { x: halfW, y: halfH },
+                { x: -halfW, y: halfH }
+            ];
+            
+            for (const corner of corners) {
+                const rotatedX = this.x + corner.x * Math.cos(this.angle) - corner.y * Math.sin(this.angle);
+                const rotatedY = this.y + corner.x * Math.sin(this.angle) + corner.y * Math.cos(this.angle);
+                points.push({ x: rotatedX, y: rotatedY });
+            }
+            
+            return points;
+        }
     }
 
     assessDamage(trackBorders) {
