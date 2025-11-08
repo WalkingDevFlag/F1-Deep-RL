@@ -20,14 +20,118 @@ let car = {
     friction: 0.95,
     damaged: false,
     polygon: [],
-    rays: [],
-    rayReadings: []
+    sensor: null
 };
 
 // Sensor properties
 const rayCount = 5;
 const rayLength = 150;
 const raySpread = Math.PI / 2;
+
+class Sensor {
+    constructor(car) {
+        this.car = car;
+        this.rayCount = rayCount;
+        this.rayLength = rayLength;
+        this.raySpread = raySpread;
+        this.rays = [];
+        this.readings = [];
+    }
+
+    update() {
+        this.castRays();
+        this.readings = [];
+        for (let i = 0; i < this.rays.length; i++) {
+            this.readings.push(this.getRayReading(this.rays[i]));
+        }
+    }
+
+    getRayReading(ray) {
+        const start = ray[0];
+        const end = ray[1];
+        const dx = end.x - start.x;
+        const dy = end.y - start.y;
+        const length = Math.hypot(dx, dy);
+        const steps = Math.ceil(length);
+        
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const px = Math.floor(start.x + dx * t);
+            const py = Math.floor(start.y + dy * t);
+            
+            if (px < 0 || py < 0 || px >= trackImg.width || py >= trackImg.height) {
+                return {
+                    x: px,
+                    y: py,
+                    offset: t
+                };
+            }
+            
+            const pixel = offscreenCtx.getImageData(px, py, 1, 1).data;
+            if (pixel[3] === 0) { // hit track boundary
+                return {
+                    x: px,
+                    y: py,
+                    offset: t
+                };
+            }
+        }
+        return null;
+    }
+
+    castRays() {
+        this.rays = [];
+        for (let i = 0; i < this.rayCount; i++) {
+            const rayAngle = lerp(
+                this.raySpread / 2,
+                -this.raySpread / 2,
+                this.rayCount == 1 ? 0.5 : i / (this.rayCount - 1)
+            ) + this.car.angle;
+
+            const start = { x: this.car.x, y: this.car.y };
+            const end = {
+                x: this.car.x - Math.sin(rayAngle) * this.rayLength,
+                y: this.car.y - Math.cos(rayAngle) * this.rayLength
+            };
+            this.rays.push([start, end]);
+        }
+    }
+
+    draw(ctx) {
+        for (let i = 0; i < this.rayCount; i++) {
+            let end = this.rays[i][1];
+            if (this.readings[i]) {
+                end = this.readings[i];
+            }
+
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "yellow";
+            ctx.moveTo(
+                this.rays[i][0].x,
+                this.rays[i][0].y
+            );
+            ctx.lineTo(
+                end.x,
+                end.y
+            );
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "black";
+            ctx.moveTo(
+                this.rays[i][1].x,
+                this.rays[i][1].y
+            );
+            ctx.lineTo(
+                end.x,
+                end.y
+            );
+            ctx.stroke();
+        }
+    }
+}
 
 let spawnPoint = { x: 400, y: 300, angle: 0 };
 
@@ -101,6 +205,7 @@ function resetCar() {
     car.speed = 0;
     car.damaged = false;
     car.polygon = createPolygon();
+    car.sensor = new Sensor(car);
     console.log('Car reset to spawn point:', spawnPoint);
 }
 
@@ -205,65 +310,6 @@ function assessDamage() {
     return false;
 }
 
-function castRays() {
-    car.rays = [];
-    for (let i = 0; i < rayCount; i++) {
-        const rayAngle = lerp(
-            raySpread / 2,
-            -raySpread / 2,
-            rayCount == 1 ? 0.5 : i / (rayCount - 1)
-        ) + car.angle;
-
-        const start = { x: car.x, y: car.y };
-        const end = {
-            x: car.x - Math.sin(rayAngle) * rayLength,
-            y: car.y - Math.cos(rayAngle) * rayLength
-        };
-        car.rays.push([start, end]);
-    }
-}
-
-function getRayReading(ray) {
-    const start = ray[0];
-    const end = ray[1];
-    const dx = end.x - start.x;
-    const dy = end.y - start.y;
-    const length = Math.hypot(dx, dy);
-    const steps = Math.ceil(length);
-    
-    for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const px = Math.floor(start.x + dx * t);
-        const py = Math.floor(start.y + dy * t);
-        
-        if (px < 0 || py < 0 || px >= trackImg.width || py >= trackImg.height) {
-            return {
-                x: px,
-                y: py,
-                offset: t
-            };
-        }
-        
-        const pixel = offscreenCtx.getImageData(px, py, 1, 1).data;
-        if (pixel[3] === 0) { // hit track boundary
-            return {
-                x: px,
-                y: py,
-                offset: t
-            };
-        }
-    }
-    return null;
-}
-
-function updateSensors() {
-    castRays();
-    car.rayReadings = [];
-    for (let i = 0; i < car.rays.length; i++) {
-        car.rayReadings.push(getRayReading(car.rays[i]));
-    }
-}
-
 function update() {
     if (!car.damaged) {
         // Simple controls - just move in direction of angle
@@ -312,31 +358,14 @@ function update() {
     }
     
     // Update sensors
-    updateSensors();
+    if (car.sensor) {
+        car.sensor.update();
+    }
 }
 
 function drawSensors() {
-    for (let i = 0; i < rayCount; i++) {
-        let end = car.rays[i][1];
-        if (car.rayReadings[i]) {
-            end = car.rayReadings[i];
-        }
-
-        // Yellow line from car to detection point
-        ctx.beginPath();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = "yellow";
-        ctx.moveTo(car.rays[i][0].x, car.rays[i][0].y);
-        ctx.lineTo(end.x, end.y);
-        ctx.stroke();
-
-        // Black line from detection point to ray end
-        ctx.beginPath();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = "black";
-        ctx.moveTo(car.rays[i][1].x, car.rays[i][1].y);
-        ctx.lineTo(end.x, end.y);
-        ctx.stroke();
+    if (car.sensor) {
+        car.sensor.draw(ctx);
     }
 }
 

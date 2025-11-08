@@ -18,6 +18,10 @@ def cars(filename):
     directory = os.path.join(os.path.dirname(__file__), '..', 'cars')
     return send_from_directory(directory, filename)
 
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204  # Return 204 No Content for favicon
+
 @app.route('/<path:filename>')
 def static_files(filename):
     directory = os.path.join(os.path.dirname(__file__), '..', 'web')
