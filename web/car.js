@@ -159,18 +159,29 @@ class Car {
 
     update(keys, trackImg, offscreenCtx, trackBorders) {
         if (!this.damaged) {
-            // Simple controls - move in direction of angle
-            let moveX = 0;
-            let moveY = 0;
-            
+            // Handle acceleration and deceleration
             if (keys['KeyW'] || keys['ArrowUp']) {
-                moveX = Math.cos(this.angle) * 3;
-                moveY = Math.sin(this.angle) * 3;
+                this.speed = Math.min(this.maxSpeed, this.speed + this.acceleration);
+            } else {
+                this.speed *= this.friction;
             }
+            
+            // Handle reverse (slower acceleration)
             if (keys['KeyS'] || keys['ArrowDown']) {
-                moveX = -Math.cos(this.angle) * 2;
-                moveY = -Math.sin(this.angle) * 2;
+                this.speed = Math.max(-this.maxSpeed / 2, this.speed - this.acceleration / 2);
             }
+            
+            // Apply turning (reduce speed slightly when turning)
+            let turnSpeed = this.speed;
+            if ((keys['KeyA'] || keys['ArrowLeft']) || (keys['KeyD'] || keys['ArrowRight'])) {
+                turnSpeed *= 0.9; // Slight speed reduction when turning
+            }
+            
+            // Calculate movement
+            let moveX = Math.cos(this.angle) * turnSpeed;
+            let moveY = Math.sin(this.angle) * turnSpeed;
+            
+            // Handle turning
             if (keys['KeyA'] || keys['ArrowLeft']) {
                 this.angle -= 0.05;
             }
