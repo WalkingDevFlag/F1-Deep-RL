@@ -14,6 +14,7 @@ class Car {
         this.damaged = false;
         this.polygon = [];
         this.sensor = null;
+        this.sensorsEnabled = true;
         this.trackImg = trackImg;
         this.offscreenCtx = offscreenCtx;
         this.carImgScale = 0.4; // The scale factor used when drawing the car image
@@ -216,14 +217,14 @@ class Car {
         }
         
         // Update sensors
-        if (this.sensor) {
+        if (this.sensor && this.sensorsEnabled) {
             this.sensor.update();
         }
     }
 
     draw(ctx, carImg) {
         // Draw sensor rays first (behind the car)
-        if (this.sensor) {
+        if (this.sensor && this.sensorsEnabled) {
             // Apply filter to sensors when car is damaged
             if (this.damaged) {
                 ctx.globalAlpha = 0.5;
@@ -251,6 +252,15 @@ class Car {
         ctx.restore();
     }
 
+    setSensorsEnabled(enabled) {
+        this.sensorsEnabled = enabled;
+        if (enabled) {
+            this.sensor = new Sensor(this);
+        } else {
+            this.sensor = null;
+        }
+    }
+
     reset(spawnPoint) {
         this.x = spawnPoint.x;
         this.y = spawnPoint.y;
@@ -258,7 +268,11 @@ class Car {
         this.speed = 0;
         this.damaged = false;
         this.polygon = this.createPolygon();
-        this.sensor = new Sensor(this);
+        if (this.sensorsEnabled) {
+            this.sensor = new Sensor(this);
+        } else {
+            this.sensor = null;
+        }
         console.log('Car reset to spawn point:', spawnPoint);
     }
 }

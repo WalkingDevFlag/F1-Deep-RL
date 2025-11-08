@@ -17,6 +17,8 @@ class Game {
         this.collisionResetTimeout = null;
         this.lastFrameTime = performance.now();
         this.deltaTime = 0;
+        this.neuralNetworkVisible = true;
+        this.uiElements = {};
     }
 
     async init() {
@@ -50,6 +52,7 @@ class Game {
 
             // Setup renderer
             this.renderer = new Renderer(this.canvas, this.ctx);
+            this.setupUI();
 
             // Start game loop
             this.setupEventListeners();
@@ -76,6 +79,59 @@ class Game {
                 this.camera.setCanvasSize(this.canvas.width, this.canvas.height);
             }
         });
+    }
+
+    setupUI() {
+        this.uiElements = {
+            fpsValue: document.getElementById('hud-fps-value'),
+            cameraValue: document.getElementById('hud-camera-value'),
+            sensorsToggle: document.getElementById('hud-sensors-toggle'),
+            sensorsStatus: document.getElementById('hud-sensors-status'),
+            nnToggle: document.getElementById('hud-nn-toggle'),
+            nnStatus: document.getElementById('hud-nn-status')
+        };
+
+        if (this.uiElements.sensorsToggle) {
+            const sensorsEnabled = this.car ? this.car.sensorsEnabled : true;
+            this.uiElements.sensorsToggle.checked = sensorsEnabled;
+            if (this.uiElements.sensorsStatus) {
+                this.uiElements.sensorsStatus.textContent = sensorsEnabled ? 'On' : 'Off';
+            }
+            this.uiElements.sensorsToggle.addEventListener('change', (event) => {
+                const enabled = event.target.checked;
+                if (this.car) {
+                    this.car.setSensorsEnabled(enabled);
+                }
+                if (this.uiElements.sensorsStatus) {
+                    this.uiElements.sensorsStatus.textContent = enabled ? 'On' : 'Off';
+                }
+            });
+        }
+
+        if (this.uiElements.nnToggle) {
+            this.uiElements.nnToggle.checked = this.neuralNetworkVisible;
+            if (this.uiElements.nnStatus) {
+                this.uiElements.nnStatus.textContent = this.neuralNetworkVisible ? 'On' : 'Off';
+            }
+            this.uiElements.nnToggle.addEventListener('change', (event) => {
+                this.neuralNetworkVisible = event.target.checked;
+                if (this.uiElements.nnStatus) {
+                    this.uiElements.nnStatus.textContent = this.neuralNetworkVisible ? 'On' : 'Off';
+                }
+                // Neural network visualisation hook will be implemented later.
+            });
+        }
+
+        this.updateHUD();
+    }
+
+    updateHUD() {
+        if (this.uiElements.fpsValue && this.renderer) {
+            this.uiElements.fpsValue.textContent = `${this.renderer.fps}`;
+        }
+        if (this.uiElements.cameraValue && this.camera) {
+            this.uiElements.cameraValue.textContent = this.camera.getModeName();
+        }
     }
 
     resetCar() {
@@ -126,6 +182,7 @@ class Game {
     loop = () => {
         this.update();
         this.draw();
+        this.updateHUD();
         requestAnimationFrame(this.loop);
     }
 }

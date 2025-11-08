@@ -41,13 +41,6 @@ class Renderer {
     }
 
     drawHUD(car, camera) {
-        this.ctx.save();
-        
-        // Draw FPS
-        this.ctx.font = 'bold 16px Arial';
-        this.ctx.fillStyle = '#000000';
-        this.ctx.fillText(`FPS: ${this.fps}`, 10, 30);
-        
-        this.ctx.restore();
+        // HUD is handled by the DOM overlay in index.html.
     }
 }
