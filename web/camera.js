@@ -14,15 +14,15 @@ class Camera {
         };
         this.currentMode = this.modes.GODS_EYE;
         
-        // Current camera state
-        this.x = 0;
-        this.y = 0;
+        // Current camera state (in world space)
+        this.worldX = 0;
+        this.worldY = 0;
         this.zoom = 1;
         this.rotation = 0;
         
         // Target camera state (for smooth transitions)
-        this.targetX = 0;
-        this.targetY = 0;
+        this.targetWorldX = 0;
+        this.targetWorldY = 0;
         this.targetZoom = 1;
         this.targetRotation = 0;
         
@@ -35,6 +35,12 @@ class Camera {
         
         // Initialize God's Eye view
         this.calculateGodsEyeView();
+        this.worldX = this.trackWidth / 2;
+        this.worldY = this.trackHeight / 2;
+        this.targetWorldX = this.worldX;
+        this.targetWorldY = this.worldY;
+        this.zoom = this.godsEyeZoom;
+        this.targetZoom = this.godsEyeZoom;
     }
     
     calculateGodsEyeView() {
@@ -42,8 +48,6 @@ class Camera {
         const scaleX = this.canvasWidth / this.trackWidth;
         const scaleY = this.canvasHeight / this.trackHeight;
         this.godsEyeZoom = Math.min(scaleX, scaleY);
-        this.godsEyeX = this.canvasWidth / 2;
-        this.godsEyeY = this.canvasHeight / 2;
     }
     
     setCanvasSize(width, height) {
@@ -51,8 +55,6 @@ class Camera {
         this.canvasHeight = height;
         this.calculateGodsEyeView();
         if (this.currentMode === this.modes.GODS_EYE) {
-            this.targetX = this.godsEyeX;
-            this.targetY = this.godsEyeY;
             this.targetZoom = this.godsEyeZoom;
         }
     }
@@ -70,23 +72,23 @@ class Camera {
     update(car) {
         // Update target based on current mode
         if (this.currentMode === this.modes.CAR_CAM) {
-            // Follow car position
-            this.targetX = this.canvasWidth / 2;
-            this.targetY = this.canvasHeight / 2 + this.carCamOffsetY;
+            // Follow car position in world space
+            this.targetWorldX = car.x;
+            this.targetWorldY = car.y;
             this.targetZoom = this.godsEyeZoom * this.carCamZoom;
             // Rotate camera to keep car pointing up (inverted)
             this.targetRotation = -car.angle - Math.PI / 2;
         } else {
-            // God's Eye view
-            this.targetX = this.godsEyeX;
-            this.targetY = this.godsEyeY;
+            // God's Eye view - center on track
+            this.targetWorldX = this.trackWidth / 2;
+            this.targetWorldY = this.trackHeight / 2;
             this.targetZoom = this.godsEyeZoom;
             this.targetRotation = 0;
         }
         
         // Smooth interpolation (lerp) to target
-        this.x += (this.targetX - this.x) * this.lerpSpeed;
-        this.y += (this.targetY - this.y) * this.lerpSpeed;
+        this.worldX += (this.targetWorldX - this.worldX) * this.lerpSpeed;
+        this.worldY += (this.targetWorldY - this.worldY) * this.lerpSpeed;
         this.zoom += (this.targetZoom - this.zoom) * this.lerpSpeed;
         
         // Handle rotation wrapping for shortest path
@@ -101,8 +103,8 @@ class Camera {
     applyTransform(ctx, car) {
         ctx.save();
         
-        // Move to camera center
-        ctx.translate(this.x, this.y);
+        // Move to screen center
+        ctx.translate(this.canvasWidth / 2, this.canvasHeight / 2);
         
         // Apply rotation
         ctx.rotate(this.rotation);
@@ -110,13 +112,8 @@ class Camera {
         // Apply zoom
         ctx.scale(this.zoom, this.zoom);
         
-        // In car cam mode, translate to follow car
-        if (this.currentMode === this.modes.CAR_CAM) {
-            ctx.translate(-car.x, -car.y);
-        } else {
-            // In God's Eye mode, center the track
-            ctx.translate(-this.trackWidth / 2, -this.trackHeight / 2);
-        }
+        // Translate to focus point in world space
+        ctx.translate(-this.worldX, -this.worldY);
     }
     
     // Restore canvas context after drawing
