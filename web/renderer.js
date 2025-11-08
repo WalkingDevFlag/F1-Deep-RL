@@ -4,9 +4,22 @@ class Renderer {
     constructor(canvas, ctx) {
         this.canvas = canvas;
         this.ctx = ctx;
+        // FPS measurement
+        this.fps = 0;
+        this.frames = 0;
+        this.lastTime = performance.now();
     }
 
     drawFrame(trackImg, car, carImg, camera) {
+        // Calculate FPS
+        const now = performance.now();
+        this.frames++;
+        if (now - this.lastTime >= 1000) {
+            this.fps = Math.round((this.frames * 1000) / (now - this.lastTime));
+            this.frames = 0;
+            this.lastTime = now;
+        }
+        
         // Clear canvas with white
         this.ctx.fillStyle = '#ffffff';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
@@ -32,6 +45,13 @@ class Renderer {
     }
 
     drawHUD(car, camera) {
-        // HUD removed
+        this.ctx.save();
+        
+        // Draw FPS
+        this.ctx.font = 'bold 16px Arial';
+        this.ctx.fillStyle = '#000000';
+        this.ctx.fillText(`FPS: ${this.fps}`, 10, 30);
+        
+        this.ctx.restore();
     }
 }

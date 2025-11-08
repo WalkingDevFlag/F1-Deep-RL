@@ -225,57 +225,11 @@ class Car {
             }
         }
 
-        // Calculate actual car image dimensions
-        const actualCarWidth = carImg.complete && carImg.naturalWidth > 0 ? carImg.width * 0.4 : this.width;
-        const actualCarHeight = carImg.complete && carImg.naturalWidth > 0 ? carImg.height * 0.4 : this.height;
-
-        // Draw car polygon (for debugging)
-        if (this.polygon.length > 0) {
-            ctx.fillStyle = this.damaged ? "rgba(255, 0, 0, 0.3)" : "rgba(0, 255, 0, 0.2)";
-            ctx.beginPath();
-            ctx.moveTo(this.polygon[0].x, this.polygon[0].y);
-            for (let i = 1; i < this.polygon.length; i++) {
-                ctx.lineTo(this.polygon[i].x, this.polygon[i].y);
-            }
-            ctx.closePath();
-            ctx.fill();
-            ctx.strokeStyle = this.damaged ? "darkred" : "lime";
-            ctx.lineWidth = 3;
-            ctx.stroke();
-            
-            // Draw all sample points being checked
-            for (let i = 0; i < this.polygon.length; i++) {
-                const start = this.polygon[i];
-                const end = this.polygon[(i + 1) % this.polygon.length];
-                
-                const dx = end.x - start.x;
-                const dy = end.y - start.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                const steps = Math.ceil(distance) + 1;
-                
-                for (let step = 0; step <= steps; step += 2) { // Show every 2nd point
-                    const t = step / steps;
-                    const x = start.x + dx * t;
-                    const y = start.y + dy * t;
-                    
-                    ctx.fillStyle = this.damaged ? "red" : "yellow";
-                    ctx.beginPath();
-                    ctx.arc(x, y, 1.5, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-            }
-        }
-        
         // Draw car image
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.angle);
         ctx.filter = this.damaged ? 'grayscale(100%)' : 'none';
-        
-        // Draw a red outline around the actual car image dimensions for debugging
-        ctx.strokeStyle = "rgba(255, 0, 255, 0.5)";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(-actualCarWidth / 2, -actualCarHeight / 2, actualCarWidth, actualCarHeight);
         
         if (carImg.complete && carImg.naturalWidth > 0) {
             ctx.drawImage(carImg, -(carImg.width / 2) * 0.4, -(carImg.height / 2) * 0.4, carImg.width * 0.4, carImg.height * 0.4);
