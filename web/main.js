@@ -34,12 +34,14 @@ class Game {
             this.offscreenCanvas.height = this.trackImg.height;
             this.offscreenCtx.drawImage(this.trackImg, 0, 0);
 
-            // Initialize track
-            this.track = new Track(this.trackImg, this.offscreenCtx, 32, 16);
-            const spawnPoint = this.track.initialize();
-
             // Initialize car with track image and offscreen context
             this.car = new Car(32, 16, 32, 16, this.trackImg, this.offscreenCtx);
+            this.car.setCarImage(this.carImg); // Set actual car dimensions based on image
+            
+            // Initialize track with ACTUAL car dimensions
+            this.track = new Track(this.trackImg, this.offscreenCtx, this.car.actualWidth, this.car.actualHeight);
+            const spawnPoint = this.track.initialize();
+            
             this.car.reset(spawnPoint);
 
             // Setup renderer
@@ -84,7 +86,8 @@ class Game {
         const keys = this.controls.getKeys();
 
         // Update car with physics and collision
-        this.car.update(keys, this.trackImg, this.offscreenCtx);
+        const trackBorders = this.track.getBorders();
+        this.car.update(keys, this.trackImg, this.offscreenCtx, trackBorders);
 
         // Handle collision auto-reset
         if (this.car.damaged && !this.collisionResetTimeout) {
