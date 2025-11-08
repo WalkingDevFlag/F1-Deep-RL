@@ -7,8 +7,8 @@ class Renderer {
     }
 
     drawFrame(trackImg, car, carImg, camera) {
-        // Clear canvas
-        this.ctx.fillStyle = '#1a1a1a';
+        // Clear canvas with white
+        this.ctx.fillStyle = '#ffffff';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
         // Apply camera transformation
