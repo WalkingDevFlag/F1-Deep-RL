@@ -32,20 +32,6 @@ class Renderer {
     }
 
     drawHUD(car, camera) {
-        this.ctx.save();
-        
-        // Draw status
-        this.ctx.font = 'bold 16px Arial';
-        this.ctx.fillStyle = car.damaged ? '#ff0000' : '#00ff00';
-        this.ctx.fillText(car.damaged ? 'DAMAGED - Press R to Reset' : 'OK', 10, this.canvas.height - 20);
-        
-        // Draw camera mode
-        this.ctx.fillStyle = '#ffffff';
-        this.ctx.fillText(`Camera: ${camera.getModeName()} (Press C to toggle)`, 10, 30);
-        
-        // Draw speed
-        this.ctx.fillText(`Speed: ${Math.abs(car.speed).toFixed(1)}`, 10, 55);
-        
-        this.ctx.restore();
+        // HUD removed
     }
 }
