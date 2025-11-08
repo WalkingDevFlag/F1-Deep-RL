@@ -192,12 +192,12 @@ class Car {
             let moveY = Math.sin(this.angle) * turnSpeed;
             
             // Handle turning (rotate angle based on delta time)
-            // 0.05 radians per 16ms (60 FPS), so scale by delta time
+            // 1.2 radians per second for slower, more controlled turning
             if (keys['KeyA'] || keys['ArrowLeft']) {
-                this.angle -= 0.05 * deltaTime * 60;
+                this.angle -= 1.4 * deltaTime;
             }
             if (keys['KeyD'] || keys['ArrowRight']) {
-                this.angle += 0.05 * deltaTime * 60;
+                this.angle += 1.4 * deltaTime;
             }
 
             // Move car
