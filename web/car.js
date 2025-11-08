@@ -210,7 +210,7 @@ class Car {
         }
     }
 
-    draw(ctx, carImg, scaleX, scaleY) {
+    draw(ctx, carImg) {
         // Draw sensor rays first (behind the car)
         if (this.sensor) {
             // Apply filter to sensors when car is damaged

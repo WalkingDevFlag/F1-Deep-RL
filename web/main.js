@@ -8,6 +8,7 @@ class Game {
         this.renderer = null;
         this.car = null;
         this.track = null;
+        this.camera = null;
         this.controls = new Controls();
         this.offscreenCanvas = document.createElement('canvas');
         this.offscreenCtx = this.offscreenCanvas.getContext('2d', { willReadFrequently: true });
@@ -26,8 +27,6 @@ class Game {
             // Setup canvas
             this.canvas.width = window.innerWidth;
             this.canvas.height = window.innerHeight;
-            const scaleX = this.canvas.width / this.trackImg.width;
-            const scaleY = this.canvas.height / this.trackImg.height;
 
             // Setup offscreen canvas for collision detection
             this.offscreenCanvas.width = this.trackImg.width;
@@ -44,9 +43,11 @@ class Game {
             
             this.car.reset(spawnPoint);
 
+            // Initialize camera
+            this.camera = new Camera(this.canvas.width, this.canvas.height, this.trackImg.width, this.trackImg.height);
+
             // Setup renderer
             this.renderer = new Renderer(this.canvas, this.ctx);
-            this.renderer.setScale(scaleX, scaleY);
 
             // Start game loop
             this.setupEventListeners();
@@ -61,14 +62,17 @@ class Game {
             if (e.code === 'KeyR') {
                 this.resetCar();
             }
+            if (e.code === 'KeyC') {
+                this.camera.toggleMode();
+            }
         });
 
         window.addEventListener('resize', () => {
             this.canvas.width = window.innerWidth;
             this.canvas.height = window.innerHeight;
-            const scaleX = this.canvas.width / this.trackImg.width;
-            const scaleY = this.canvas.height / this.trackImg.height;
-            this.renderer.setScale(scaleX, scaleY);
+            if (this.camera) {
+                this.camera.setCanvasSize(this.canvas.width, this.canvas.height);
+            }
         });
     }
 
@@ -89,6 +93,9 @@ class Game {
         const trackBorders = this.track.getBorders();
         this.car.update(keys, this.trackImg, this.offscreenCtx, trackBorders);
 
+        // Update camera
+        this.camera.update(this.car);
+
         // Handle collision auto-reset
         if (this.car.damaged && !this.collisionResetTimeout) {
             console.log('Collision detected! Press R to reset.');
@@ -106,7 +113,7 @@ class Game {
     }
 
     draw() {
-        this.renderer.drawFrame(this.trackImg, this.car, this.carImg);
+        this.renderer.drawFrame(this.trackImg, this.car, this.carImg, this.camera);
     }
 
     loop = () => {
