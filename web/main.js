@@ -82,55 +82,93 @@ class Game {
     }
 
     setupUI() {
-        this.uiElements = {
-            fpsValue: document.getElementById('hud-fps-value'),
-            cameraValue: document.getElementById('hud-camera-value'),
-            sensorsToggle: document.getElementById('hud-sensors-toggle'),
-            sensorsStatus: document.getElementById('hud-sensors-status'),
-            nnToggle: document.getElementById('hud-nn-toggle'),
-            nnStatus: document.getElementById('hud-nn-status')
-        };
-
-        if (this.uiElements.sensorsToggle) {
-            const sensorsEnabled = this.car ? this.car.sensorsEnabled : true;
-            this.uiElements.sensorsToggle.checked = sensorsEnabled;
-            if (this.uiElements.sensorsStatus) {
-                this.uiElements.sensorsStatus.textContent = sensorsEnabled ? 'On' : 'Off';
+        if (this.uiElements && this.uiElements.hudCard && this.uiElements.hudCard.element instanceof HTMLElement) {
+            const { element } = this.uiElements.hudCard;
+            if (element.parentElement) {
+                element.parentElement.removeChild(element);
             }
-            this.uiElements.sensorsToggle.addEventListener('change', (event) => {
-                const enabled = event.target.checked;
+        }
+
+        if (!window.UIKit) {
+            console.warn('UIKit module not loaded; skipping HUD setup.');
+            this.uiElements = {};
+            return;
+        }
+
+        const sensorsEnabled = this.car ? this.car.sensorsEnabled : true;
+        const cameraName = this.camera ? this.camera.getModeName() : "God's Eye View";
+
+    // Compose the HUD card and its controls using the shared UI kit.
+        const { createCard, createStatRow, createToggleRow } = window.UIKit;
+
+        const hudCard = createCard({ title: 'Driver Console', overlay: true });
+        hudCard.element.setAttribute('aria-label', 'Driver control panel');
+
+        const fpsRow = createStatRow({ label: 'FPS', value: '0' });
+        const cameraRow = createStatRow({ label: 'Camera', value: cameraName });
+        const sensorsRow = createToggleRow({
+            label: 'Sensors',
+            initial: sensorsEnabled,
+            onToggle: (enabled) => {
                 if (this.car) {
                     this.car.setSensorsEnabled(enabled);
                 }
-                if (this.uiElements.sensorsStatus) {
-                    this.uiElements.sensorsStatus.textContent = enabled ? 'On' : 'Off';
-                }
-            });
+            }
+        });
+        const nnRow = createToggleRow({
+            label: 'Neural Net',
+            initial: this.neuralNetworkVisible,
+            onToggle: (enabled) => {
+                this.neuralNetworkVisible = enabled;
+            }
+        });
+
+        hudCard.addMany([fpsRow, cameraRow, sensorsRow, nnRow]);
+        if (document.body) {
+            document.body.appendChild(hudCard.element);
         }
 
-        if (this.uiElements.nnToggle) {
-            this.uiElements.nnToggle.checked = this.neuralNetworkVisible;
-            if (this.uiElements.nnStatus) {
-                this.uiElements.nnStatus.textContent = this.neuralNetworkVisible ? 'On' : 'Off';
-            }
-            this.uiElements.nnToggle.addEventListener('change', (event) => {
-                this.neuralNetworkVisible = event.target.checked;
-                if (this.uiElements.nnStatus) {
-                    this.uiElements.nnStatus.textContent = this.neuralNetworkVisible ? 'On' : 'Off';
-                }
-                // Neural network visualisation hook will be implemented later.
-            });
-        }
+        this.uiElements = {
+            hudCard,
+            fpsRow,
+            cameraRow,
+            sensorsRow,
+            nnRow
+        };
 
         this.updateHUD();
     }
 
     updateHUD() {
-        if (this.uiElements.fpsValue && this.renderer) {
-            this.uiElements.fpsValue.textContent = `${this.renderer.fps}`;
+        if (!this.uiElements) {
+            return;
         }
-        if (this.uiElements.cameraValue && this.camera) {
-            this.uiElements.cameraValue.textContent = this.camera.getModeName();
+
+        if (this.uiElements.fpsRow && typeof this.uiElements.fpsRow.setValue === 'function' && this.renderer) {
+            this.uiElements.fpsRow.setValue(this.renderer.fps);
+        }
+
+        if (this.uiElements.cameraRow && typeof this.uiElements.cameraRow.setValue === 'function' && this.camera) {
+            this.uiElements.cameraRow.setValue(this.camera.getModeName());
+        }
+
+        const sensorsEnabled = this.car ? this.car.sensorsEnabled : true;
+        if (this.uiElements.sensorsRow && typeof this.uiElements.sensorsRow.setChecked === 'function') {
+            const currentSensorsState = typeof this.uiElements.sensorsRow.getChecked === 'function'
+                ? this.uiElements.sensorsRow.getChecked()
+                : null;
+            if (currentSensorsState !== sensorsEnabled) {
+                this.uiElements.sensorsRow.setChecked(sensorsEnabled, { silent: true });
+            }
+        }
+
+        if (this.uiElements.nnRow && typeof this.uiElements.nnRow.setChecked === 'function') {
+            const currentNNState = typeof this.uiElements.nnRow.getChecked === 'function'
+                ? this.uiElements.nnRow.getChecked()
+                : null;
+            if (currentNNState !== this.neuralNetworkVisible) {
+                this.uiElements.nnRow.setChecked(this.neuralNetworkVisible, { silent: true });
+            }
         }
     }
 
