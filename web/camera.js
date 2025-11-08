@@ -74,8 +74,8 @@ class Camera {
             this.targetX = this.canvasWidth / 2;
             this.targetY = this.canvasHeight / 2 + this.carCamOffsetY;
             this.targetZoom = this.godsEyeZoom * this.carCamZoom;
-            // Rotate camera to keep car pointing up
-            this.targetRotation = -car.angle + Math.PI / 2;
+            // Rotate camera to keep car pointing up (inverted)
+            this.targetRotation = -car.angle - Math.PI / 2;
         } else {
             // God's Eye view
             this.targetX = this.godsEyeX;
