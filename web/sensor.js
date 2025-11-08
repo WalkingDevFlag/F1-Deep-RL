@@ -54,16 +54,19 @@ class Sensor {
     castRays() {
         this.rays = [];
         for (let i = 0; i < this.rayCount; i++) {
-            const rayAngle = lerp(
+            // Calculate angle spread relative to car's facing direction
+            const rayOffset = lerp(
                 this.raySpread / 2,
                 -this.raySpread / 2,
                 this.rayCount == 1 ? 0.5 : i / (this.rayCount - 1)
-            ) + this.car.angle;
+            );
+            
+            const rayAngle = this.car.angle + rayOffset;
 
             const start = { x: this.car.x, y: this.car.y };
             const end = {
-                x: this.car.x + Math.sin(rayAngle) * this.rayLength,
-                y: this.car.y - Math.cos(rayAngle) * this.rayLength
+                x: this.car.x + Math.cos(rayAngle) * this.rayLength,
+                y: this.car.y + Math.sin(rayAngle) * this.rayLength
             };
             this.rays.push([start, end]);
         }
