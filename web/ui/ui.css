@@ -15,7 +15,8 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
-canvas {
+/* Main game canvas only - other canvases (previews) keep their intrinsic size */
+canvas#canvas {
     width: 100vw;
     height: 100vh;
     border: none;
@@ -282,6 +283,62 @@ canvas {
     gap: 18px;
 }
 
+.editor-modal.is-uploading .editor-modal__content {
+    max-width: 880px;
+    width: 92vw;
+    padding: 18px;
+}
+
+.editor-upload__form .ui-card__body {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 18px;
+    align-items: start;
+}
+
+.editor-upload__fields {
+    max-height: 66vh;
+    overflow-y: auto;
+    padding-right: 6px;
+}
+
+.editor-upload__preview .editor-upload__canvas,
+.preview-canvas {
+    max-width: 520px;
+    max-height: 320px;
+    width: auto;
+    height: auto;
+    display: block;
+}
+
+.preview-area {
+    position: relative;
+    width: 100%;
+    max-width: 520px;
+    max-height: 320px;
+    overflow: auto;
+    border-radius: 6px;
+}
+
+.preview-checker {
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(45deg, #eee 25%, transparent 25%),
+                      linear-gradient(-45deg, #eee 25%, transparent 25%),
+                      linear-gradient(45deg, transparent 75%, #fff 75%),
+                      linear-gradient(-45deg, transparent 75%, #fff 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    z-index: 0;
+    display: none;
+}
+
+.preview-canvas {
+    position: relative;
+    z-index: 1;
+    background: transparent;
+}
+
 .editor-modal__content .ui-card__body {
     gap: 18px;
 }
@@ -492,4 +549,89 @@ canvas {
         left: 8px;
         width: auto;
     }
+}
+
+.editor-upload__form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.editor-upload__fields {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.editor-upload__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.editor-upload__label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--hud-text);
+}
+
+.editor-upload__input {
+    padding: 10px 12px;
+    border: 2px solid var(--hud-border);
+    border-radius: 6px;
+    background: var(--hud-surface);
+    color: var(--hud-text);
+    font-size: 14px;
+    outline: none;
+}
+
+.editor-upload__input:focus {
+    border-color: var(--hud-accent);
+}
+
+.editor-upload__input[type="file"] {
+    padding: 8px;
+}
+
+.editor-upload__preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    border: 2px solid var(--hud-border);
+    border-radius: 8px;
+    background: var(--hud-bg);
+}
+
+.editor-upload__canvas {
+    border: 2px solid var(--hud-border);
+    border-radius: 6px;
+    background: var(--hud-surface);
+}
+
+.editor-upload__message {
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+}
+
+.editor-upload__message--success {
+    color: #28a745;
+}
+
+.editor-upload__message--warning {
+    color: #ffc107;
+}
+
+.editor-upload__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+.editor-modal__action--primary {
+    background: var(--hud-accent);
+    color: #ffffff;
 }

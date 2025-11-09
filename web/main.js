@@ -19,6 +19,8 @@ function openEditorModal() {
     modal.hidden = false;
     modal.setAttribute('aria-hidden', 'false');
     editorModalReturnFocus = editorButton instanceof HTMLElement ? editorButton : null;
+    // Ensure we show the root view every time the modal opens
+    hideUploadPanel();
     requestAnimationFrame(() => {
         modal.classList.add('is-open');
         const primaryButton = modal.querySelector('[data-editor-action]');
@@ -109,16 +111,16 @@ function initializeEditorModal() {
     }
 
     const content = modal.querySelector('.editor-modal__content');
-    if (content) {
-        content.addEventListener('click', (event) => {
-            event.stopPropagation();
-        });
+    if (!content) return;
+
+    // store initial modal root so we can restore it later
+    if (!originalModalContent) {
+        originalModalContent = content.innerHTML;
     }
 
-    modal.addEventListener('click', (event) => {
-        if (event.target === modal) {
-            closeEditorModal();
-        }
+    // keep clicks inside the content from accidentally bubbling
+    content.addEventListener('click', (event) => {
+        event.stopPropagation();
     });
 
     const closeButtons = modal.querySelectorAll('[data-editor-close]');
@@ -139,9 +141,262 @@ function initializeEditorModal() {
     const uploadButton = modal.querySelector('[data-editor-action="upload"]');
     if (uploadButton) {
         uploadButton.addEventListener('click', () => {
-            console.info('Upload New Track flow is coming soon.');
+            showUploadPanel();
         });
     }
+}
+
+// Upload panel state
+let originalModalContent = null;
+let currentPreviewFile = null;
+let previewCanvas = null;
+let previewMessage = null;
+
+function showUploadPanel() {
+    const modal = document.getElementById('editor-modal');
+    if (!modal) return;
+
+    const content = modal.querySelector('.editor-modal__content');
+    if (!content) return;
+
+    // Mark modal as showing upload UI (used by CSS)
+    modal.classList.add('is-uploading');
+
+    // Create upload form
+    const uploadForm = document.createElement('div');
+    uploadForm.className = 'editor-upload__form';
+
+    uploadForm.innerHTML = `
+        <h2 class="ui-card__title">Upload New Track</h2>
+        <div class="ui-card__body">
+            <div class="editor-upload__fields">
+                <label class="editor-upload__field">
+                    <span class="editor-upload__label">Track Name</span>
+                    <input type="text" class="editor-upload__input" id="track-name" placeholder="Enter track name">
+                </label>
+                <label class="editor-upload__field">
+                    <span class="editor-upload__label">Author</span>
+                    <input type="text" class="editor-upload__input" id="track-author" placeholder="Enter author name">
+                </label>
+                <label class="editor-upload__field">
+                    <span class="editor-upload__label">Track Image</span>
+                    <input type="file" class="editor-upload__input" id="track-file" accept="image/*">
+                </label>
+                <label class="editor-upload__field">
+                    <span class="editor-upload__label">Cover Image (Optional)</span>
+                    <input type="file" class="editor-upload__input" id="cover-file" accept="image/*">
+                </label>
+            </div>
+            <div class="editor-upload__preview">
+                <canvas id="preview-canvas" class="editor-upload__canvas" width="200" height="200"></canvas>
+                <div id="preview-message" class="editor-upload__message"></div>
+            </div>
+            <div class="editor-upload__actions">
+                <button type="button" class="editor-modal__action" id="preview-btn" disabled>Preview</button>
+                <button type="button" class="editor-modal__action" id="auto-mask-btn" disabled>Auto-mask</button>
+                <button type="button" class="editor-modal__action editor-modal__action--primary" id="upload-btn" disabled>Upload</button>
+                <button type="button" class="editor-modal__action editor-modal__action--secondary" id="cancel-upload-btn">Cancel</button>
+            </div>
+        </div>
+    `;
+
+    content.innerHTML = '';
+    content.appendChild(uploadForm);
+
+    // Get elements
+    const trackFileInput = document.getElementById('track-file');
+    const previewBtn = document.getElementById('preview-btn');
+    const autoMaskBtn = document.getElementById('auto-mask-btn');
+    const uploadBtn = document.getElementById('upload-btn');
+    const cancelBtn = document.getElementById('cancel-upload-btn');
+    previewCanvas = document.getElementById('preview-canvas');
+    previewMessage = document.getElementById('preview-message');
+
+    // Event listeners
+    trackFileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            currentPreviewFile = file;
+            previewBtn.disabled = false;
+            autoMaskBtn.disabled = false;
+            uploadBtn.disabled = false;
+            validatePreview(file);
+        } else {
+            currentPreviewFile = null;
+            previewBtn.disabled = true;
+            autoMaskBtn.disabled = true;
+            uploadBtn.disabled = true;
+            clearPreview();
+        }
+    });
+
+    previewBtn.addEventListener('click', () => {
+        if (currentPreviewFile) {
+            validatePreview(currentPreviewFile);
+        }
+    });
+
+    autoMaskBtn.addEventListener('click', () => {
+        if (currentPreviewFile) {
+            autoMaskPreview(currentPreviewFile);
+        }
+    });
+
+    uploadBtn.addEventListener('click', () => {
+        console.info('Upload functionality coming soon.');
+    });
+
+    cancelBtn.addEventListener('click', () => {
+        hideUploadPanel();
+    });
+}
+
+function hideUploadPanel() {
+    const modal = document.getElementById('editor-modal');
+    if (!modal || !originalModalContent) return;
+
+    const content = modal.querySelector('.editor-modal__content');
+    if (content) {
+        content.innerHTML = originalModalContent;
+        // Re-attach event listeners
+        const uploadButton = content.querySelector('[data-editor-action="upload"]');
+        if (uploadButton) {
+            uploadButton.addEventListener('click', () => {
+                showUploadPanel();
+            });
+        }
+    }
+    // clear upload-specific state and CSS hook
+    modal.classList.remove('is-uploading');
+    currentPreviewFile = null;
+    previewCanvas = null;
+    previewMessage = null;
+}
+
+function clearPreview() {
+    if (previewCanvas) {
+        const ctx = previewCanvas.getContext('2d');
+        ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+    }
+    if (previewMessage) {
+        previewMessage.textContent = '';
+    }
+}
+
+function validatePreview(file) {
+    if (!file || !previewCanvas || !previewMessage) return;
+
+    const img = new Image();
+    img.onload = () => {
+        const ctx = previewCanvas.getContext('2d');
+        const canvas = document.createElement('canvas');
+        const offCtx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        offCtx.drawImage(img, 0, 0);
+
+        // Check transparency
+        let hasTransparency = false;
+        if (file.type === 'image/jpeg') {
+            hasTransparency = true; // JPG doesn't support alpha, but warn
+        } else {
+            // Sample border pixels
+            const imageData = offCtx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            // Check top and bottom rows, left and right columns
+            for (let x = 0; x < canvas.width; x++) {
+                // Top row
+                const topIndex = (x * 4) + 3;
+                if (data[topIndex] < 255) hasTransparency = true;
+                // Bottom row
+                const bottomIndex = ((canvas.height - 1) * canvas.width * 4) + (x * 4) + 3;
+                if (data[bottomIndex] < 255) hasTransparency = true;
+            }
+            for (let y = 0; y < canvas.height; y++) {
+                // Left column
+                const leftIndex = (y * canvas.width * 4) + 3;
+                if (data[leftIndex] < 255) hasTransparency = true;
+                // Right column
+                const rightIndex = (y * canvas.width * 4) + ((canvas.width - 1) * 4) + 3;
+                if (data[rightIndex] < 255) hasTransparency = true;
+            }
+        }
+
+        // Draw preview
+        ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+        const scale = Math.min(previewCanvas.width / img.width, previewCanvas.height / img.height);
+        const x = (previewCanvas.width - img.width * scale) / 2;
+        const y = (previewCanvas.height - img.height * scale) / 2;
+        ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+
+        // Set message
+        if (file.type === 'image/jpeg') {
+            previewMessage.textContent = '⚠️ JPG detected - transparency not supported';
+            previewMessage.className = 'editor-upload__message editor-upload__message--warning';
+        } else if (hasTransparency) {
+            previewMessage.textContent = '⚠️ Transparency detected on borders';
+            previewMessage.className = 'editor-upload__message editor-upload__message--warning';
+        } else {
+            previewMessage.textContent = '✅ Looks good';
+            previewMessage.className = 'editor-upload__message editor-upload__message--success';
+        }
+    };
+    img.src = URL.createObjectURL(file);
+}
+
+function autoMaskPreview(file) {
+    if (!file || !previewCanvas || !previewMessage) return;
+
+    const img = new Image();
+    img.onload = () => {
+        const ctx = previewCanvas.getContext('2d');
+        const canvas = document.createElement('canvas');
+        const offCtx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        offCtx.drawImage(img, 0, 0);
+
+        // Get image data
+        const imageData = offCtx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+
+        // Convert to grayscale and threshold
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            const gray = (r + g + b) / 3;
+            const threshold = 128; // Simple threshold
+            const alpha = gray > threshold ? 255 : 0;
+            data[i] = 255; // White
+            data[i + 1] = 255;
+            data[i + 2] = 255;
+            data[i + 3] = alpha;
+        }
+
+        offCtx.putImageData(imageData, 0, 0);
+
+        // Draw checkerboard background
+        ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+        const squareSize = 10;
+        for (let y = 0; y < previewCanvas.height; y += squareSize) {
+            for (let x = 0; x < previewCanvas.width; x += squareSize) {
+                ctx.fillStyle = (x / squareSize + y / squareSize) % 2 === 0 ? '#cccccc' : '#ffffff';
+                ctx.fillRect(x, y, squareSize, squareSize);
+            }
+        }
+
+        // Draw masked image
+        const scale = Math.min(previewCanvas.width / img.width, previewCanvas.height / img.height);
+        const x = (previewCanvas.width - img.width * scale) / 2;
+        const y = (previewCanvas.height - img.height * scale) / 2;
+        ctx.drawImage(canvas, x, y, img.width * scale, img.height * scale);
+
+        // Update message
+        previewMessage.textContent = '✅ Auto-masked applied';
+        previewMessage.className = 'editor-upload__message editor-upload__message--success';
+    };
+    img.src = URL.createObjectURL(file);
 }
 
 // Main game logic and loop
