@@ -1,3 +1,149 @@
+// Editor modal helpers
+let editorModalEscListener = null;
+let editorModalReturnFocus = null;
+
+function openEditorModal() {
+    const modal = document.getElementById('editor-modal');
+    const dock = document.getElementById('editor-dock');
+    const editorButton = document.querySelector('[data-dock-action="editor"]');
+
+    if (!modal) {
+        console.warn('Editor modal element not found.');
+        return;
+    }
+
+    if (!modal.hidden && modal.classList.contains('is-open')) {
+        return;
+    }
+
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    editorModalReturnFocus = editorButton instanceof HTMLElement ? editorButton : null;
+    requestAnimationFrame(() => {
+        modal.classList.add('is-open');
+        const primaryButton = modal.querySelector('[data-editor-action]');
+        if (primaryButton instanceof HTMLElement) {
+            primaryButton.focus({ preventScroll: true });
+        } else {
+            const modalPanel = modal.querySelector('.editor-modal__content');
+            if (modalPanel instanceof HTMLElement) {
+                modalPanel.focus({ preventScroll: true });
+            }
+        }
+    });
+
+    if (dock) {
+        dock.hidden = false;
+        dock.setAttribute('aria-hidden', 'false');
+        requestAnimationFrame(() => {
+            dock.classList.add('is-visible');
+        });
+    }
+
+    if (editorButton) {
+        editorButton.classList.add('is-active');
+    }
+
+    if (!editorModalEscListener) {
+        editorModalEscListener = (event) => {
+            if (event.key === 'Escape') {
+                closeEditorModal();
+            }
+        };
+        document.addEventListener('keydown', editorModalEscListener);
+    }
+}
+
+function closeEditorModal() {
+    const modal = document.getElementById('editor-modal');
+    const dock = document.getElementById('editor-dock');
+    const editorButton = document.querySelector('[data-dock-action="editor"]');
+
+    if (!modal || modal.hidden) {
+        return;
+    }
+
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    modal.addEventListener('transitionend', () => {
+        modal.hidden = true;
+    }, { once: true });
+    window.setTimeout(() => {
+        if (!modal.hidden) {
+            modal.hidden = true;
+        }
+    }, 320);
+
+    if (dock) {
+        dock.classList.remove('is-visible');
+        dock.setAttribute('aria-hidden', 'true');
+        dock.addEventListener('transitionend', () => {
+            dock.hidden = true;
+        }, { once: true });
+        window.setTimeout(() => {
+            if (!dock.hidden) {
+                dock.hidden = true;
+            }
+        }, 340);
+    }
+
+    if (editorButton) {
+        editorButton.classList.remove('is-active');
+    }
+
+    if (editorModalEscListener) {
+        document.removeEventListener('keydown', editorModalEscListener);
+        editorModalEscListener = null;
+    }
+
+    if (editorModalReturnFocus && typeof editorModalReturnFocus.focus === 'function') {
+        editorModalReturnFocus.focus({ preventScroll: true });
+    }
+    editorModalReturnFocus = null;
+}
+
+function initializeEditorModal() {
+    const modal = document.getElementById('editor-modal');
+    if (!modal) {
+        return;
+    }
+
+    const content = modal.querySelector('.editor-modal__content');
+    if (content) {
+        content.addEventListener('click', (event) => {
+            event.stopPropagation();
+        });
+    }
+
+    modal.addEventListener('click', (event) => {
+        if (event.target === modal) {
+            closeEditorModal();
+        }
+    });
+
+    const closeButtons = modal.querySelectorAll('[data-editor-close]');
+    closeButtons.forEach((button) => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            closeEditorModal();
+        });
+    });
+
+    const loadButton = modal.querySelector('[data-editor-action="load"]');
+    if (loadButton) {
+        loadButton.addEventListener('click', () => {
+            console.info('Load Existing Track flow is coming soon.');
+        });
+    }
+
+    const uploadButton = modal.querySelector('[data-editor-action="upload"]');
+    if (uploadButton) {
+        uploadButton.addEventListener('click', () => {
+            console.info('Upload New Track flow is coming soon.');
+        });
+    }
+}
+
 // Main game logic and loop
 
 class Game {
@@ -89,7 +235,9 @@ class Game {
                     element.parentElement.removeChild(element);
                 }
             }
-            if (this.uiElements.dock && this.uiElements.dock.element instanceof HTMLElement) {
+            if (this.uiElements.dock
+                && this.uiElements.dock.detachOnReset
+                && this.uiElements.dock.element instanceof HTMLElement) {
                 const dockElement = this.uiElements.dock.element;
                 if (dockElement.parentElement) {
                     dockElement.parentElement.removeChild(dockElement);
@@ -103,8 +251,8 @@ class Game {
             return;
         }
 
-    const sensorsEnabled = this.car ? this.car.sensorsEnabled : true;
-    const cameraName = this.camera ? this.camera.getModeName() : "God's Eye View";
+        const sensorsEnabled = this.car ? this.car.sensorsEnabled : true;
+        const cameraName = this.camera ? this.camera.getModeName() : "God's Eye View";
 
         const createSvgIcon = (segments = []) => {
             const NS = 'http://www.w3.org/2000/svg';
@@ -144,7 +292,7 @@ class Game {
             { d: 'M18.5 13.5l-5 5V21h2.5l5-5z' }
         ]);
 
-    // Compose the HUD card and its controls using the shared UI kit.
+        // Compose the HUD card and its controls using the shared UI kit.
         const { createCard, createStatRow, createToggleRow, createDock, createDockButton } = window.UIKit;
 
         const hudCard = createCard({ title: 'Driver Console', overlay: true });
@@ -174,28 +322,59 @@ class Game {
             document.body.appendChild(hudCard.element);
         }
 
-        const dock = createDock({ label: 'Simulator dock' });
-        const homeButton = createDockButton({
-            label: 'Home',
-            tooltip: 'Go to dashboard',
-            icon: homeIcon,
-            onClick: () => {
-                window.location.href = '/';
-            }
-        });
-        const levelEditorButton = createDockButton({
-            label: 'Level Editor',
-            tooltip: 'Open Level Editor',
-            icon: levelEditorIcon,
-            onClick: () => {
-                // Placeholder action until the level editor is available.
-                console.info('Level Editor coming soon.');
-            }
-        });
+        let dockElementRef = null;
+        let homeButtonRef = null;
+        let levelEditorButtonRef = null;
+        let dockShouldDetach = false;
 
-        dock.addMany([homeButton, levelEditorButton]);
-        if (document.body) {
-            document.body.appendChild(dock.element);
+        const staticDock = document.getElementById('main-dock');
+        if (staticDock) {
+            dockElementRef = staticDock;
+            dockShouldDetach = false;
+            homeButtonRef = staticDock.querySelector('[data-dock-action="home"]');
+            levelEditorButtonRef = staticDock.querySelector('[data-dock-action="editor"]');
+
+            if (homeButtonRef) {
+                homeButtonRef.onclick = (event) => {
+                    event.preventDefault();
+                    window.location.href = '/';
+                };
+            }
+
+            if (levelEditorButtonRef) {
+                levelEditorButtonRef.onclick = (event) => {
+                    event.preventDefault();
+                    openEditorModal();
+                };
+            }
+        } else {
+            const dock = createDock({ label: 'Simulator dock' });
+            const homeButton = createDockButton({
+                label: 'Home',
+                tooltip: 'Go to dashboard',
+                icon: homeIcon,
+                onClick: () => {
+                    window.location.href = '/';
+                }
+            });
+            const levelEditorButton = createDockButton({
+                label: 'Level Editor',
+                tooltip: 'Open Level Editor',
+                icon: levelEditorIcon,
+                onClick: () => {
+                    openEditorModal();
+                }
+            });
+
+            dock.addMany([homeButton, levelEditorButton]);
+            if (document.body) {
+                document.body.appendChild(dock.element);
+            }
+
+            dockElementRef = dock.element;
+            homeButtonRef = homeButton.element;
+            levelEditorButtonRef = levelEditorButton.element;
+            dockShouldDetach = true;
         }
 
         this.uiElements = {
@@ -205,9 +384,10 @@ class Game {
             sensorsRow,
             nnRow,
             dock: {
-                element: dock.element,
-                homeButton,
-                levelEditorButton,
+                element: dockElementRef,
+                homeButton: homeButtonRef,
+                levelEditorButton: levelEditorButtonRef,
+                detachOnReset: dockShouldDetach,
             },
         };
 
@@ -299,6 +479,10 @@ class Game {
         requestAnimationFrame(this.loop);
     }
 }
+
+window.addEventListener('DOMContentLoaded', () => {
+    initializeEditorModal();
+});
 
 // Start game when page loads
 window.addEventListener('load', () => {

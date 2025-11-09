@@ -8,6 +8,73 @@
 </head>
 <body>
     <canvas id="canvas"></canvas>
+
+    <aside id="editor-dock" class="editor-dock" aria-hidden="true" hidden>
+        <header class="editor-dock__header">
+            <h3 class="editor-dock__title">Editor Workspace</h3>
+            <p class="editor-dock__subtitle">Tools are docking soon. Get your track ready.</p>
+        </header>
+        <div class="editor-dock__section">
+            <span class="editor-dock__section-label">Toolbox</span>
+            <div class="editor-dock__tools">
+                <button type="button" class="editor-dock__tool" disabled>
+                    <span>Track Layout</span>
+                    <span class="editor-dock__badge">Soon</span>
+                </button>
+                <button type="button" class="editor-dock__tool" disabled>
+                    <span>Spawn Points</span>
+                    <span class="editor-dock__badge">Soon</span>
+                </button>
+                <button type="button" class="editor-dock__tool" disabled>
+                    <span>AI Settings</span>
+                    <span class="editor-dock__badge">Soon</span>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <nav id="main-dock" class="ui-dock" data-align="bottom" role="toolbar" aria-label="Simulator dock" data-persistent="true">
+        <div class="ui-dock__items">
+            <button type="button" class="ui-dock__button" data-dock-action="home" aria-label="Go to dashboard">
+                <span class="ui-dock__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 11l9-7 9 7"></path>
+                        <path d="M5 10v10h14V10"></path>
+                        <path d="M9 21V12h6v9"></path>
+                    </svg>
+                </span>
+                <span class="ui-dock__label">Home</span>
+                <span class="ui-dock__tooltip">Home</span>
+            </button>
+            <button type="button" class="ui-dock__button" data-dock-action="editor" aria-label="Open Level Editor">
+                <span class="ui-dock__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 4h6v6H4z"></path>
+                        <path d="M14 4h6v6h-6z"></path>
+                        <path d="M4 14h6v6H4z"></path>
+                        <path d="M18.5 13.5l-5 5V21h2.5l5-5z"></path>
+                    </svg>
+                </span>
+                <span class="ui-dock__label">Level Editor</span>
+                <span class="ui-dock__tooltip">Level Editor</span>
+            </button>
+        </div>
+    </nav>
+
+    <div id="editor-modal" class="editor-modal" role="dialog" aria-modal="true" aria-labelledby="editor-modal-title" aria-describedby="editor-modal-description" aria-hidden="true" hidden>
+        <section class="ui-card editor-modal__content" role="document" tabindex="-1">
+            <button type="button" class="editor-modal__close" aria-label="Close editor modal" data-editor-close>&times;</button>
+            <h2 class="ui-card__title" id="editor-modal-title">Create or Edit a Track</h2>
+            <div class="ui-card__body">
+                <p class="editor-modal__lead" id="editor-modal-description">Load an existing layout or upload a fresh build to start crafting your circuit.</p>
+                <div class="editor-modal__actions">
+                    <button type="button" class="editor-modal__action" data-editor-action="load">Load Existing</button>
+                    <button type="button" class="editor-modal__action editor-modal__action--secondary" data-editor-action="upload">Upload New Track</button>
+                </div>
+                <p class="editor-modal__hint">Bring your best racing lines&mdash;the track builder is warming up.</p>
+            </div>
+        </section>
+    </div>
     
     <!-- Utility modules -->
     <script src="utils.js" defer></script>
