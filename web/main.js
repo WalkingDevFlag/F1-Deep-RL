@@ -123,27 +123,7 @@ function initializeEditorModal() {
         event.stopPropagation();
     });
 
-    const closeButtons = modal.querySelectorAll('[data-editor-close]');
-    closeButtons.forEach((button) => {
-        button.addEventListener('click', (event) => {
-            event.preventDefault();
-            closeEditorModal();
-        });
-    });
-
-    const loadButton = modal.querySelector('[data-editor-action="load"]');
-    if (loadButton) {
-        loadButton.addEventListener('click', () => {
-            console.info('Load Existing Track flow is coming soon.');
-        });
-    }
-
-    const uploadButton = modal.querySelector('[data-editor-action="upload"]');
-    if (uploadButton) {
-        uploadButton.addEventListener('click', () => {
-            showUploadPanel();
-        });
-    }
+    attachModalRootHandlers(modal);
 }
 
 // Upload panel state
@@ -151,6 +131,44 @@ let originalModalContent = null;
 let currentPreviewFile = null;
 let previewCanvas = null;
 let previewMessage = null;
+
+function attachModalRootHandlers(modal) {
+    if (!modal) {
+        return;
+    }
+    const content = modal.querySelector('.editor-modal__content');
+    if (!content) {
+        return;
+    }
+
+    const closeButtons = content.querySelectorAll('[data-editor-close]');
+    closeButtons.forEach((button) => {
+        if (!button.dataset.listenerAttached) {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                closeEditorModal();
+            });
+            button.dataset.listenerAttached = 'true';
+        }
+    });
+
+    const loadButton = content.querySelector('[data-editor-action="load"]');
+    if (loadButton && !loadButton.dataset.listenerAttached) {
+        loadButton.addEventListener('click', () => {
+            console.info('Load Existing Track flow is coming soon.');
+        });
+        loadButton.dataset.listenerAttached = 'true';
+    }
+
+    const uploadButton = content.querySelector('[data-editor-action="upload"]');
+    if (uploadButton && !uploadButton.dataset.listenerAttached) {
+        uploadButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            showUploadPanel();
+        });
+        uploadButton.dataset.listenerAttached = 'true';
+    }
+}
 
 function showUploadPanel() {
     const modal = document.getElementById('editor-modal');
@@ -167,6 +185,7 @@ function showUploadPanel() {
     uploadForm.className = 'editor-upload__form';
 
     uploadForm.innerHTML = `
+        <button type="button" class="editor-modal__close" aria-label="Close editor modal" data-editor-close>&times;</button>
         <h2 class="ui-card__title">Upload New Track</h2>
         <div class="ui-card__body">
             <div class="editor-upload__fields">
@@ -192,8 +211,6 @@ function showUploadPanel() {
                 <div id="preview-message" class="editor-upload__message"></div>
             </div>
             <div class="editor-upload__actions">
-                <button type="button" class="editor-modal__action" id="preview-btn" disabled>Preview</button>
-                <button type="button" class="editor-modal__action" id="auto-mask-btn" disabled>Auto-mask</button>
                 <button type="button" class="editor-modal__action editor-modal__action--primary" id="upload-btn" disabled>Upload</button>
                 <button type="button" class="editor-modal__action editor-modal__action--secondary" id="cancel-upload-btn">Cancel</button>
             </div>
@@ -205,40 +222,30 @@ function showUploadPanel() {
 
     // Get elements
     const trackFileInput = document.getElementById('track-file');
-    const previewBtn = document.getElementById('preview-btn');
-    const autoMaskBtn = document.getElementById('auto-mask-btn');
     const uploadBtn = document.getElementById('upload-btn');
     const cancelBtn = document.getElementById('cancel-upload-btn');
     previewCanvas = document.getElementById('preview-canvas');
     previewMessage = document.getElementById('preview-message');
+
+    const closeButtons = uploadForm.querySelectorAll('[data-editor-close]');
+    closeButtons.forEach((button) => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            closeEditorModal();
+        });
+    });
 
     // Event listeners
     trackFileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (file) {
             currentPreviewFile = file;
-            previewBtn.disabled = false;
-            autoMaskBtn.disabled = false;
             uploadBtn.disabled = false;
             validatePreview(file);
         } else {
             currentPreviewFile = null;
-            previewBtn.disabled = true;
-            autoMaskBtn.disabled = true;
             uploadBtn.disabled = true;
             clearPreview();
-        }
-    });
-
-    previewBtn.addEventListener('click', () => {
-        if (currentPreviewFile) {
-            validatePreview(currentPreviewFile);
-        }
-    });
-
-    autoMaskBtn.addEventListener('click', () => {
-        if (currentPreviewFile) {
-            autoMaskPreview(currentPreviewFile);
         }
     });
 
@@ -259,12 +266,7 @@ function hideUploadPanel() {
     if (content) {
         content.innerHTML = originalModalContent;
         // Re-attach event listeners
-        const uploadButton = content.querySelector('[data-editor-action="upload"]');
-        if (uploadButton) {
-            uploadButton.addEventListener('click', () => {
-                showUploadPanel();
-            });
-        }
+        attachModalRootHandlers(modal);
     }
     // clear upload-specific state and CSS hook
     modal.classList.remove('is-uploading');
