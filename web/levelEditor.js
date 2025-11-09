@@ -5,15 +5,21 @@ class LevelEditor {
         this.canvas = document.getElementById('editor-canvas');
         this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
         this.trackNameEl = document.getElementById('editor-track-name');
-        this.trackAuthorEl = document.getElementById('editor-track-author');
         this.exitBtn = document.getElementById('editor-exit-btn');
         this.currentMeta = null;
         this.trackImage = null;
 
+        // Pan and zoom properties
+        this.zoom = 1;
+        this.panX = 0;
+        this.panY = 0;
+        this.isDragging = false;
+        this.lastMouseX = 0;
+        this.lastMouseY = 0;
+
         console.log('LevelEditor constructor, container:', this.container);
         console.log('canvas:', this.canvas);
         console.log('trackNameEl:', this.trackNameEl);
-        console.log('trackAuthorEl:', this.trackAuthorEl);
         console.log('exitBtn:', this.exitBtn);
 
         this.setupEventListeners();
@@ -56,6 +62,78 @@ class LevelEditor {
                 this.hideEditor();
             });
         }
+
+        // Mouse wheel for zooming
+        this.canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            this.handleZoom(e);
+        });
+
+        // Mouse events for panning
+        this.canvas.addEventListener('mousedown', (e) => {
+            this.handleMouseDown(e);
+        });
+
+        this.canvas.addEventListener('mousemove', (e) => {
+            this.handleMouseMove(e);
+        });
+
+        this.canvas.addEventListener('mouseup', () => {
+            this.handleMouseUp();
+        });
+
+        this.canvas.addEventListener('mouseleave', () => {
+            this.handleMouseUp();
+        });
+    }
+
+    handleZoom(e) {
+        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+        const mouseX = e.offsetX;
+        const mouseY = e.offsetY;
+
+        // Calculate zoom center in world coordinates
+        const worldX = (mouseX - this.panX) / this.zoom;
+        const worldY = (mouseY - this.panY) / this.zoom;
+
+        // Apply zoom
+        this.zoom *= zoomFactor;
+
+        // Clamp zoom to reasonable limits
+        this.zoom = Math.max(0.1, Math.min(5, this.zoom));
+
+        // Adjust pan to keep zoom center at mouse position
+        this.panX = mouseX - worldX * this.zoom;
+        this.panY = mouseY - worldY * this.zoom;
+
+        this.render();
+    }
+
+    handleMouseDown(e) {
+        this.isDragging = true;
+        this.lastMouseX = e.offsetX;
+        this.lastMouseY = e.offsetY;
+        this.canvas.style.cursor = 'grabbing';
+    }
+
+    handleMouseMove(e) {
+        if (this.isDragging) {
+            const deltaX = e.offsetX - this.lastMouseX;
+            const deltaY = e.offsetY - this.lastMouseY;
+
+            this.panX += deltaX;
+            this.panY += deltaY;
+
+            this.lastMouseX = e.offsetX;
+            this.lastMouseY = e.offsetY;
+
+            this.render();
+        }
+    }
+
+    handleMouseUp() {
+        this.isDragging = false;
+        this.canvas.style.cursor = 'grab';
     }
 
     async initEditorWith(meta) {
@@ -68,16 +146,14 @@ class LevelEditor {
             console.error('Editor canvas not found');
             return;
         }
-        if (!this.trackNameEl) {
-            console.error('Track name element not found');
-            return;
-        }
         this.currentMeta = meta;
         this.trackNameEl.textContent = meta.name || 'Unknown Track';
-        this.trackAuthorEl.textContent = meta.author || 'Unknown Author';
 
         // Load the base image using fallback logic
         await this.loadBaseImage(meta);
+
+        // Initialize pan to center the track
+        this.initializeView();
 
         // Render the editor
         this.render();
@@ -148,6 +224,15 @@ class LevelEditor {
         }
     }
 
+    initializeView() {
+        if (this.trackImage && this.canvas) {
+            // Center the track in the full-screen canvas initially
+            this.panX = (this.canvas.width - this.trackImage.width) / 2;
+            this.panY = (this.canvas.height - this.trackImage.height) / 2;
+            this.zoom = 1;
+        }
+    }
+
     loadImage(url) {
         return new Promise((resolve, reject) => {
             const img = new Image();
@@ -163,31 +248,21 @@ class LevelEditor {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
         if (this.trackImage) {
-            // Calculate scaling to fit canvas while maintaining aspect ratio
-            const canvasAspect = this.canvas.width / this.canvas.height;
-            const imageAspect = this.trackImage.width / this.trackImage.height;
+            // Save context for transformations
+            this.ctx.save();
 
-            let drawWidth, drawHeight, drawX, drawY;
+            // Apply zoom and pan transformations
+            this.ctx.translate(this.panX, this.panY);
+            this.ctx.scale(this.zoom, this.zoom);
 
-            if (imageAspect > canvasAspect) {
-                // Image is wider, fit to width
-                drawWidth = this.canvas.width;
-                drawHeight = this.canvas.width / imageAspect;
-                drawX = 0;
-                drawY = (this.canvas.height - drawHeight) / 2;
-            } else {
-                // Image is taller, fit to height
-                drawHeight = this.canvas.height;
-                drawWidth = this.canvas.height * imageAspect;
-                drawX = (this.canvas.width - drawWidth) / 2;
-                drawY = 0;
-            }
+            // Draw the track image at original size
+            this.ctx.drawImage(this.trackImage, 0, 0);
 
-            // Draw the track image
-            this.ctx.drawImage(this.trackImage, drawX, drawY, drawWidth, drawHeight);
+            // Restore context
+            this.ctx.restore();
 
             // Draw simple placeholders
-            this.drawPlaceholders(drawX, drawY, drawWidth, drawHeight);
+            // this.drawPlaceholders(drawX, drawY, drawWidth, drawHeight);
         } else {
             // No image loaded, show message
             this.ctx.fillStyle = '#666';
@@ -195,12 +270,6 @@ class LevelEditor {
             this.ctx.textAlign = 'center';
             this.ctx.fillText('No base image found for this track', this.canvas.width / 2, this.canvas.height / 2);
         }
-
-        // Draw track info
-        this.ctx.fillStyle = '#222';
-        this.ctx.font = '16px Arial';
-        this.ctx.textAlign = 'left';
-        this.ctx.fillText(`Track Loaded: ${this.currentMeta?.name || 'Unknown'}`, 20, 30);
     }
 
     drawPlaceholders(x, y, width, height) {
@@ -219,10 +288,18 @@ class LevelEditor {
     showEditor() {
         console.log('LevelEditor.showEditor called');
         
-        // Set canvas size
-        this.canvas.width = window.innerWidth - 40; // Account for padding
-        this.canvas.height = window.innerHeight - 120; // Account for header and padding
+        // Set canvas size to full screen
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
         console.log('Canvas size set to', this.canvas.width, this.canvas.height);
+
+        // Initialize view if we have a track loaded
+        if (this.trackImage) {
+            this.initializeView();
+        }
+
+        // Set cursor style for panning
+        this.canvas.style.cursor = 'grab';
 
         // Show editor
         if (this.container) {

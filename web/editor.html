@@ -9,13 +9,14 @@
 <body>
     <!-- Level Editor -->
     <div id="level-editor" class="level-editor">
-        <header class="level-editor__header">
-            <h1 class="level-editor__title">Editing: <span id="editor-track-name">Unknown Track</span> — <span id="editor-track-author">Unknown Author</span></h1>
+        <!-- Top left overlay for title and exit -->
+        <div class="level-editor__overlay">
+            <h1 class="level-editor__title" id="editor-track-name">Unknown Track</h1>
             <button type="button" class="level-editor__exit" id="editor-exit-btn">Exit</button>
-        </header>
-        <main class="level-editor__main">
-            <canvas id="editor-canvas" class="level-editor__canvas"></canvas>
-        </main>
+        </div>
+        
+        <canvas id="editor-canvas" class="level-editor__canvas"></canvas>
+        
         <nav id="level-editor-dock" class="ui-dock" data-align="bottom" role="toolbar" aria-label="Level Editor dock">
             <div class="ui-dock__items">
                 <button type="button" class="ui-dock__button" disabled data-tool="select" aria-label="Select Tool">
