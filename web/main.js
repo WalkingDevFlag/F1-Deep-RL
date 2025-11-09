@@ -82,10 +82,18 @@ class Game {
     }
 
     setupUI() {
-        if (this.uiElements && this.uiElements.hudCard && this.uiElements.hudCard.element instanceof HTMLElement) {
-            const { element } = this.uiElements.hudCard;
-            if (element.parentElement) {
-                element.parentElement.removeChild(element);
+        if (this.uiElements) {
+            if (this.uiElements.hudCard && this.uiElements.hudCard.element instanceof HTMLElement) {
+                const { element } = this.uiElements.hudCard;
+                if (element.parentElement) {
+                    element.parentElement.removeChild(element);
+                }
+            }
+            if (this.uiElements.dock && this.uiElements.dock.element instanceof HTMLElement) {
+                const dockElement = this.uiElements.dock.element;
+                if (dockElement.parentElement) {
+                    dockElement.parentElement.removeChild(dockElement);
+                }
             }
         }
 
@@ -95,11 +103,49 @@ class Game {
             return;
         }
 
-        const sensorsEnabled = this.car ? this.car.sensorsEnabled : true;
-        const cameraName = this.camera ? this.camera.getModeName() : "God's Eye View";
+    const sensorsEnabled = this.car ? this.car.sensorsEnabled : true;
+    const cameraName = this.camera ? this.camera.getModeName() : "God's Eye View";
+
+        const createSvgIcon = (segments = []) => {
+            const NS = 'http://www.w3.org/2000/svg';
+            const svg = document.createElementNS(NS, 'svg');
+            svg.setAttribute('viewBox', '0 0 24 24');
+            svg.setAttribute('aria-hidden', 'true');
+            svg.setAttribute('focusable', 'false');
+            svg.setAttribute('fill', 'none');
+            svg.setAttribute('stroke', 'currentColor');
+            svg.setAttribute('stroke-width', '1.8');
+            svg.setAttribute('stroke-linecap', 'round');
+            svg.setAttribute('stroke-linejoin', 'round');
+
+            segments.forEach((segment) => {
+                const tag = segment.tag || 'path';
+                const attrs = segment.attrs || { d: segment.d || segment };
+                const element = document.createElementNS(NS, tag);
+                Object.entries(attrs).forEach(([key, value]) => {
+                    element.setAttribute(key, value);
+                });
+                svg.appendChild(element);
+            });
+
+            return svg;
+        };
+
+        const homeIcon = createSvgIcon([
+            { d: 'M3 11l9-7 9 7' },
+            { d: 'M5 10v10h14V10' },
+            { d: 'M9 21V12h6v9' }
+        ]);
+
+        const levelEditorIcon = createSvgIcon([
+            { d: 'M4 4h6v6H4z' },
+            { d: 'M14 4h6v6h-6z' },
+            { d: 'M4 14h6v6H4z' },
+            { d: 'M18.5 13.5l-5 5V21h2.5l5-5z' }
+        ]);
 
     // Compose the HUD card and its controls using the shared UI kit.
-        const { createCard, createStatRow, createToggleRow } = window.UIKit;
+        const { createCard, createStatRow, createToggleRow, createDock, createDockButton } = window.UIKit;
 
         const hudCard = createCard({ title: 'Driver Console', overlay: true });
         hudCard.element.setAttribute('aria-label', 'Driver control panel');
@@ -128,12 +174,41 @@ class Game {
             document.body.appendChild(hudCard.element);
         }
 
+        const dock = createDock({ label: 'Simulator dock' });
+        const homeButton = createDockButton({
+            label: 'Home',
+            tooltip: 'Go to dashboard',
+            icon: homeIcon,
+            onClick: () => {
+                window.location.href = '/';
+            }
+        });
+        const levelEditorButton = createDockButton({
+            label: 'Level Editor',
+            tooltip: 'Open Level Editor',
+            icon: levelEditorIcon,
+            onClick: () => {
+                // Placeholder action until the level editor is available.
+                console.info('Level Editor coming soon.');
+            }
+        });
+
+        dock.addMany([homeButton, levelEditorButton]);
+        if (document.body) {
+            document.body.appendChild(dock.element);
+        }
+
         this.uiElements = {
             hudCard,
             fpsRow,
             cameraRow,
             sensorsRow,
-            nnRow
+            nnRow,
+            dock: {
+                element: dock.element,
+                homeButton,
+                levelEditorButton,
+            },
         };
 
         this.updateHUD();

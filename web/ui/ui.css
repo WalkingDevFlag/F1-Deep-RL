@@ -140,3 +140,100 @@ canvas {
 .ui-toggle:checked + .ui-slider:before {
     transform: translateX(30px);
 }
+
+.ui-dock {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: 20px;
+    background: var(--hud-bg);
+    border: 2px solid var(--hud-border);
+    border-radius: 16px;
+    box-shadow: var(--hud-shadow);
+    padding: 12px 18px 6px;
+    display: flex;
+    justify-content: center;
+    z-index: 12;
+    transition: transform 0.2s ease;
+}
+
+.ui-dock[data-align='top'] {
+    top: 20px;
+    bottom: unset;
+}
+
+.ui-dock__items {
+    display: flex;
+    align-items: flex-end;
+    gap: 18px;
+}
+
+.ui-dock__button {
+    position: relative;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+    border: 2px solid var(--hud-border);
+    background: var(--hud-surface);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ui-dock__button:hover,
+.ui-dock__button:focus-visible {
+    transform: translateY(-8px) scale(1.1);
+    box-shadow: none;
+    outline: none;
+}
+
+.ui-dock__button svg,
+.ui-dock__icon {
+    width: 28px;
+    height: 28px;
+    fill: currentColor;
+}
+
+.ui-dock__label,
+.ui-dock__description,
+.ui-dock__shortcut {
+    display: none;
+}
+
+.ui-dock__tooltip {
+    position: absolute;
+    left: 50%;
+    bottom: 68px;
+    transform: translateX(-50%);
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: var(--hud-surface);
+    border: 2px solid var(--hud-border);
+    box-shadow: var(--hud-shadow);
+    color: var(--hud-text);
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.ui-dock__button:hover .ui-dock__tooltip,
+.ui-dock__button:focus-visible .ui-dock__tooltip {
+    opacity: 1;
+    transform: translate(-50%, -6px);
+}
+
+@media (max-width: 768px) {
+    .ui-dock {
+        bottom: 12px;
+        padding: 10px 16px 6px;
+    }
+
+    .ui-dock__items {
+        gap: 14px;
+    }
