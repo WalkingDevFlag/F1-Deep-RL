@@ -45,6 +45,37 @@ export function applyStartFinishMixin(LevelEditor) {
             return { type: 'line' };
         }
 
+        // Check walls
+        if (this.editorState.walls) {
+            for (let i = 0; i < this.editorState.walls.length; i++) {
+                const wall = this.editorState.walls[i];
+                const wx1 = wall[0].x;
+                const wy1 = wall[0].y;
+                const wx2 = wall[1].x;
+                const wy2 = wall[1].y;
+
+                const wallLength = Math.hypot(wx2 - wx1, wy2 - wy1);
+                if (wallLength === 0) {
+                    continue;
+                }
+
+                const wdx = wx2 - wx1;
+                const wdy = wy2 - wy1;
+                const wpx = worldX - wx1;
+                const wpy = worldY - wy1;
+                const wdot = wpx * wdx + wpy * wdy;
+                const wproj = wdot / (wallLength * wallLength);
+                const wclampedProj = Math.max(0, Math.min(1, wproj));
+                const wclosestX = wx1 + wclampedProj * wdx;
+                const wclosestY = wy1 + wclampedProj * wdy;
+                const distToWall = Math.hypot(worldX - wclosestX, worldY - wclosestY);
+
+                if (distToWall <= threshold) {
+                    return { type: 'wall', index: i };
+                }
+            }
+        }
+
         return null;
     };
 

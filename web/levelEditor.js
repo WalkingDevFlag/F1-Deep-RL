@@ -17,9 +17,11 @@ class LevelEditor {
 			startLine: null,
 			spawn: null,
 			selectedObject: null,
+			walls: [],
 			uiToggles: {
 				showCheckpoints: true,
-				showStartFinish: true
+				showStartFinish: true,
+				showWalls: true
 			}
 		};
 
@@ -107,6 +109,7 @@ class LevelEditor {
 		this.updateTrackLabel(baseName);
 
 		await this.loadBaseImage(meta);
+		this.extractBorders();
 		this.initializeView();
 		this.render();
 		this.showEditor();
@@ -174,6 +177,63 @@ class LevelEditor {
 			img.onerror = reject;
 			img.src = url;
 		});
+	}
+
+	extractBorders() {
+		if (!this.trackImage) {
+			console.warn('No track image to extract borders from');
+			this.editorState.walls = [];
+			return;
+		}
+
+		// Create offscreen canvas to get image data
+		const offscreenCanvas = document.createElement('canvas');
+		const offscreenCtx = offscreenCanvas.getContext('2d');
+		offscreenCanvas.width = this.trackImage.width;
+		offscreenCanvas.height = this.trackImage.height;
+		offscreenCtx.drawImage(this.trackImage, 0, 0);
+
+		const imageData = offscreenCtx.getImageData(0, 0, this.trackImage.width, this.trackImage.height);
+		const borders = [];
+		const step = 5; // Sample every 5 pixels for performance
+
+		// Scan the image and find border pixels (transition from track to non-track)
+		for (let y = 0; y < this.trackImage.height; y += step) {
+			for (let x = 0; x < this.trackImage.width; x += step) {
+				const idx = (y * this.trackImage.width + x) * 4;
+				const isOnTrack = imageData.data[idx + 3] > 0;
+
+				if (isOnTrack) {
+					// Check neighbors to see if we're at a border
+					const neighbors = [
+						{ dx: step, dy: 0 },
+						{ dx: 0, dy: step },
+						{ dx: -step, dy: 0 },
+						{ dx: 0, dy: -step }
+					];
+
+					for (const { dx, dy } of neighbors) {
+						const nx = x + dx;
+						const ny = y + dy;
+						if (nx >= 0 && nx < this.trackImage.width && ny >= 0 && ny < this.trackImage.height) {
+							const nIdx = (ny * this.trackImage.width + nx) * 4;
+							const neighborOnTrack = imageData.data[nIdx + 3] > 0;
+
+							if (!neighborOnTrack) {
+								// This is a border pixel - create a small line segment
+								borders.push([
+									{ x: x, y: y },
+									{ x: nx, y: ny }
+								]);
+							}
+						}
+					}
+				}
+			}
+		}
+
+		console.log(`Extracted ${borders.length} border segments`);
+		this.editorState.walls = borders;
 	}
 
 	showEditor() {

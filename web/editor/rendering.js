@@ -19,6 +19,8 @@ export function applyRenderingMixin(LevelEditor) {
                 this.drawStartFinishPreview();
             }
 
+            this.drawWalls();
+
             this.ctx.restore();
         } else {
             this.ctx.fillStyle = '#666';
@@ -83,6 +85,23 @@ export function applyRenderingMixin(LevelEditor) {
         this.ctx.beginPath();
         this.ctx.rect(x2 - size / 2, y2 - size / 2, size, size);
         this.ctx.fill();
+        this.ctx.stroke();
+    };
+
+    LevelEditor.prototype.drawWalls = function drawWalls() {
+        if (!this.editorState.walls || this.editorState.walls.length === 0 || !this.editorState.uiToggles.showWalls) {
+            return;
+        }
+
+        this.ctx.strokeStyle = 'red';
+        this.ctx.lineWidth = 1;
+        this.ctx.beginPath();
+
+        for (const wall of this.editorState.walls) {
+            this.ctx.moveTo(wall[0].x, wall[0].y);
+            this.ctx.lineTo(wall[1].x, wall[1].y);
+        }
+
         this.ctx.stroke();
     };
 

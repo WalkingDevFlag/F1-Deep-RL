@@ -63,7 +63,16 @@ export function applyHudMixin(LevelEditor) {
         }
     });
 
-    hudCard.addMany([trackNameRow, checkpointsToggle, startFinishToggle]);
+    const wallsToggle = createToggleRow({
+        label: 'Walls',
+        initial: this.editorState.uiToggles.showWalls,
+        onToggle: (checked) => {
+        this.editorState.uiToggles.showWalls = checked;
+        this.render();
+        }
+    });
+
+    hudCard.addMany([trackNameRow, checkpointsToggle, startFinishToggle, wallsToggle]);
     this.hudCardContainer.appendChild(hudCard.element);
 
     this.trackNameEl = trackNameRow;
@@ -77,7 +86,7 @@ export function applyHudMixin(LevelEditor) {
 
     if (this.headerTitleEl) {
         const headerSuffix = this.editorState.startLine ? ' (start ready)' : '';
-        this.headerTitleEl.textContent = `Level Editor - ${baseName}${headerSuffix}`;
+        this.headerTitleEl.textContent = `${baseName}${headerSuffix}`;
     }
     };
 }
