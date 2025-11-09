@@ -43,6 +43,58 @@ canvas#canvas {
     z-index: 10;
 }
 
+.editor-header {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    right: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.editor-header__title {
+    display: inline-flex;
+    align-items: center;
+    margin: 0;
+    padding: 10px 16px;
+    background: var(--hud-bg);
+    border: 2px solid var(--hud-border);
+    border-radius: 6px;
+    box-shadow: var(--hud-shadow);
+    color: var(--hud-text);
+    pointer-events: auto;
+}
+
+.editor-header__button {
+    pointer-events: auto;
+    display: inline-flex;
+    align-items: center;
+    padding: 10px 16px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 2px solid var(--hud-border);
+    background: var(--hud-surface);
+    color: var(--hud-text);
+    box-shadow: var(--hud-shadow);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.editor-header__button:hover,
+.editor-header__button:focus-visible {
+    transform: translate(-2px, -2px);
+    box-shadow: none;
+    outline: none;
+}
+
+.editor-hud-card {
+    top: 96px;
+}
+
 .ui-card__title {
     margin: 0;
     font-size: 18px;
@@ -648,43 +700,6 @@ canvas#canvas {
 
 .level-editor[hidden] {
     display: none !important;
-}
-
-.level-editor__overlay {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    right: 20px;
-    z-index: 35;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-
-.level-editor__title {
-    margin: 0;
-    font-size: 24px;
-    font-weight: 700;
-    color: #222222;
-}
-
-.level-editor__exit {
-    padding: 8px 16px;
-    border: 2px solid #1f1f1f;
-    border-radius: 6px;
-    background: #ffffff;
-    color: #222222;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: 4px 4px #1f1f1f;
-}
-
-.level-editor__exit:hover,
-.level-editor__exit:focus-visible {
-    transform: translate(-2px, -2px);
-    box-shadow: 2px 2px #1f1f1f;
-    outline: none;
 }
 
 .level-editor__canvas {

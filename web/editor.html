@@ -9,16 +9,26 @@
 <body>
     <!-- Level Editor -->
     <div id="level-editor" class="level-editor">
-        <!-- Top left overlay for title and exit -->
-        <div class="level-editor__overlay">
-            <h1 class="level-editor__title" id="editor-track-name">Unknown Track</h1>
-            <button type="button" class="level-editor__exit" id="editor-exit-btn">Exit</button>
-        </div>
+        <!-- Editor HUD Card (added by JS) -->
+        <div id="editorHudCard"></div>
         
         <canvas id="editor-canvas" class="level-editor__canvas"></canvas>
         
         <nav id="level-editor-dock" class="ui-dock" data-align="bottom" role="toolbar" aria-label="Level Editor dock">
             <div class="ui-dock__items">
+                <button type="button" class="ui-dock__button" disabled data-tool="pan" aria-label="Pan/Zoom Mode">
+                    <span class="ui-dock__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 9l-3 3 3 3"></path>
+                            <path d="M9 5l3-3 3 3"></path>
+                            <path d="M15 9l3-3 3 3"></path>
+                            <path d="M9 15l-3 3-3-3"></path>
+                            <path d="M12 12h.01"></path>
+                        </svg>
+                    </span>
+                    <span class="ui-dock__label">Pan/Zoom</span>
+                    <span class="ui-dock__tooltip">Pan/Zoom</span>
+                </button>
                 <button type="button" class="ui-dock__button" disabled data-tool="select" aria-label="Select Tool">
                     <span class="ui-dock__icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -135,8 +145,16 @@
 
     <!-- Utility modules -->
     <script src="utils.js" defer></script>
+
+    <!-- UI helper modules -->
+    <script src="ui/base.js" defer></script>
+    <script src="ui/card.js" defer></script>
+    <script src="ui/toggle-row.js" defer></script>
+    <script src="ui/dock.js" defer></script>
+    <script src="ui/dock-button.js" defer></script>
+    <script src="ui/ui.js" defer></script>
     
     <!-- Level Editor module -->
-    <script src="levelEditor.js" defer></script>
+    <script type="module" src="levelEditor.js"></script>
 </body>
 </html>
