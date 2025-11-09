@@ -155,7 +155,7 @@ function attachModalRootHandlers(modal) {
     const loadButton = content.querySelector('[data-editor-action="load"]');
     if (loadButton && !loadButton.dataset.listenerAttached) {
         loadButton.addEventListener('click', () => {
-            console.info('Load Existing Track flow is coming soon.');
+            showLoadPanel();
         });
         loadButton.dataset.listenerAttached = 'true';
     }
@@ -168,6 +168,94 @@ function attachModalRootHandlers(modal) {
         });
         uploadButton.dataset.listenerAttached = 'true';
     }
+}
+
+function showLoadPanel() {
+    const modal = document.getElementById('editor-modal');
+    if (!modal) return;
+
+    const content = modal.querySelector('.editor-modal__content');
+    if (!content) return;
+
+    // Mark modal as showing load UI
+    modal.classList.add('is-loading');
+
+    // Create load form
+    const loadForm = document.createElement('div');
+    loadForm.className = 'editor-load__form';
+
+    loadForm.innerHTML = `
+        <button type="button" class="editor-modal__close" aria-label="Close editor modal" data-editor-close>&times;</button>
+        <h2 class="ui-card__title">Load Existing Track</h2>
+        <div class="ui-card__body">
+            <div class="editor-load__list" id="track-list">
+                <div class="editor-load__loading">Loading tracks...</div>
+            </div>
+        </div>
+    `;
+
+    content.innerHTML = '';
+    content.appendChild(loadForm);
+
+    // Get elements
+    const trackList = document.getElementById('track-list');
+
+    const closeButtons = loadForm.querySelectorAll('[data-editor-close]');
+    closeButtons.forEach((button) => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            closeEditorModal();
+        });
+    });
+
+    // Fetch tracks list
+    fetch('/tracks/list')
+        .then(response => response.json())
+        .then(tracks => {
+            if (tracks.length === 0) {
+                trackList.innerHTML = '<div class="editor-load__empty">No tracks found. Upload one first!</div>';
+                return;
+            }
+            
+            const listHtml = tracks.map(track => `
+                <button type="button" class="editor-load__item" data-track-id="${track.id}">
+                    <div class="editor-load__name">${track.name}</div>
+                    <div class="editor-load__author">by ${track.author}</div>
+                </button>
+            `).join('');
+            
+            trackList.innerHTML = listHtml;
+            
+            // Add click handlers
+            trackList.querySelectorAll('.editor-load__item').forEach(button => {
+                button.addEventListener('click', () => {
+                    const trackId = button.dataset.trackId;
+                    loadTrack(trackId);
+                });
+            });
+        })
+        .catch(error => {
+            console.error('Failed to load tracks:', error);
+            trackList.innerHTML = '<div class="editor-load__error">Failed to load tracks. Try again later.</div>';
+        });
+}
+
+function loadTrack(trackId) {
+    fetch(`/tracks/load/${trackId}`)
+        .then(response => response.json())
+        .then(meta => {
+            if (meta.error) {
+                alert('Error loading track: ' + meta.error);
+                return;
+            }
+            // Call initEditorWith (placeholder)
+            initEditorWith(meta);
+            closeEditorModal();
+        })
+        .catch(error => {
+            console.error('Failed to load track:', error);
+            alert('Failed to load track. Try again later.');
+        });
 }
 
 function showUploadPanel() {
@@ -250,7 +338,48 @@ function showUploadPanel() {
     });
 
     uploadBtn.addEventListener('click', () => {
-        console.info('Upload functionality coming soon.');
+        const name = document.getElementById('track-name').value.trim();
+        const author = document.getElementById('track-author').value.trim();
+        const file = currentPreviewFile;
+        const cover = document.getElementById('cover-file').files[0];
+        
+        if (!name || !file) {
+            alert('Please enter a track name and select a file.');
+            return;
+        }
+        
+        uploadBtn.disabled = true;
+        uploadBtn.textContent = 'Uploading...';
+        
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('author', author);
+        formData.append('file', file);
+        if (cover) {
+            formData.append('cover', cover);
+        }
+        
+        fetch('/tracks/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.error) {
+                alert('Upload failed: ' + result.error);
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload';
+                return;
+            }
+            // Success - navigate to editor
+            window.location.href = `editor.html?track=${result.meta.id}`;
+        })
+        .catch(error => {
+            console.error('Upload error:', error);
+            alert('Upload failed. Please try again.');
+            uploadBtn.disabled = false;
+            uploadBtn.textContent = 'Upload';
+        });
     });
 
     cancelBtn.addEventListener('click', () => {
@@ -399,6 +528,81 @@ function autoMaskPreview(file) {
         previewMessage.className = 'editor-upload__message editor-upload__message--success';
     };
     img.src = URL.createObjectURL(file);
+}
+
+function showLoadPanel() {
+    const modal = document.getElementById('editor-modal');
+    if (!modal) return;
+
+    const content = modal.querySelector('.editor-modal__content');
+    if (!content) return;
+
+    // Mark modal as showing load UI
+    modal.classList.add('is-loading');
+
+    // Create load form
+    const loadForm = document.createElement('div');
+    loadForm.className = 'editor-load__form';
+
+    loadForm.innerHTML = `
+        <button type="button" class="editor-modal__close" aria-label="Close editor modal" data-editor-close>&times;</button>
+        <h2 class="ui-card__title">Load Existing Track</h2>
+        <div class="ui-card__body">
+            <div class="editor-load__list" id="track-list">
+                <div class="editor-load__loading">Loading tracks...</div>
+            </div>
+        </div>
+    `;
+
+    content.innerHTML = '';
+    content.appendChild(loadForm);
+
+    // Get elements
+    const trackList = document.getElementById('track-list');
+
+    const closeButtons = loadForm.querySelectorAll('[data-editor-close]');
+    closeButtons.forEach((button) => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            closeEditorModal();
+        });
+    });
+
+    // Fetch tracks list
+    fetch('/tracks/list')
+        .then(response => response.json())
+        .then(tracks => {
+            if (tracks.length === 0) {
+                trackList.innerHTML = '<div class="editor-load__empty">No tracks found. Upload one first!</div>';
+                return;
+            }
+            
+            const listHtml = tracks.map(track => `
+                <button type="button" class="editor-load__item" data-track-id="${track.id}">
+                    <div class="editor-load__name">${track.name}</div>
+                    <div class="editor-load__author">by ${track.author}</div>
+                </button>
+            `).join('');
+            
+            trackList.innerHTML = listHtml;
+            
+            // Add click handlers
+            trackList.querySelectorAll('.editor-load__item').forEach(button => {
+                button.addEventListener('click', () => {
+                    const trackId = button.dataset.trackId;
+                    loadTrack(trackId);
+                });
+            });
+        })
+        .catch(error => {
+            console.error('Failed to load tracks:', error);
+            trackList.innerHTML = '<div class="editor-load__error">Failed to load tracks. Try again later.</div>';
+        });
+}
+
+function loadTrack(trackId) {
+    // Navigate to editor with track ID
+    window.location.href = `editor.html?track=${trackId}`;
 }
 
 // Main game logic and loop
