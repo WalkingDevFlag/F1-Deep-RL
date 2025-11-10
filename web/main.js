@@ -631,9 +631,10 @@ class Game {
     async init() {
         try {
             // Load assets
-            const { trackImg, carImg } = await this.assetLoader.loadAssets();
+            const { trackImg, carImg, trackMeta } = await this.assetLoader.loadAssets();
             this.trackImg = trackImg;
             this.carImg = carImg;
+            this.trackMeta = trackMeta;
 
             // Setup canvas
             this.canvas.width = window.innerWidth;
@@ -648,9 +649,9 @@ class Game {
             this.car = new Car(32, 16, 32, 16, this.trackImg, this.offscreenCtx);
             this.car.setCarImage(this.carImg); // Set actual car dimensions based on image
             
-            // Initialize track with ACTUAL car dimensions
-            this.track = new Track(this.trackImg, this.offscreenCtx, this.car.actualWidth, this.car.actualHeight);
-            const spawnPoint = this.track.initialize();
+            // Initialize track with ACTUAL car dimensions and track meta
+            this.track = new Track(this.trackImg, this.offscreenCtx, this.car.actualWidth, this.car.actualHeight, this.trackMeta);
+            const spawnPoint = await this.track.initialize();
             
             this.car.reset(spawnPoint);
 
@@ -777,8 +778,17 @@ class Game {
                 this.neuralNetworkVisible = enabled;
             }
         });
+        const wallsRow = createToggleRow({
+            label: 'Walls',
+            initial: this.renderer ? this.renderer.showWalls : false,
+            onToggle: (enabled) => {
+                if (this.renderer) {
+                    this.renderer.setShowWalls(enabled);
+                }
+            }
+        });
 
-        hudCard.addMany([fpsRow, cameraRow, sensorsRow, nnRow]);
+        hudCard.addMany([fpsRow, cameraRow, sensorsRow, nnRow, wallsRow]);
         if (document.body) {
             document.body.appendChild(hudCard.element);
         }
@@ -844,6 +854,7 @@ class Game {
             cameraRow,
             sensorsRow,
             nnRow,
+            wallsRow,
             dock: {
                 element: dockElementRef,
                 homeButton: homeButtonRef,
@@ -884,6 +895,16 @@ class Game {
                 : null;
             if (currentNNState !== this.neuralNetworkVisible) {
                 this.uiElements.nnRow.setChecked(this.neuralNetworkVisible, { silent: true });
+            }
+        }
+
+        if (this.uiElements.wallsRow && typeof this.uiElements.wallsRow.setChecked === 'function' && this.renderer) {
+            const currentWallsState = typeof this.uiElements.wallsRow.getChecked === 'function'
+                ? this.uiElements.wallsRow.getChecked()
+                : null;
+            const rendererWallsState = this.renderer.showWalls;
+            if (currentWallsState !== rendererWallsState) {
+                this.uiElements.wallsRow.setChecked(rendererWallsState, { silent: true });
             }
         }
     }
@@ -930,7 +951,7 @@ class Game {
     }
 
     draw() {
-        this.renderer.drawFrame(this.trackImg, this.car, this.carImg, this.camera);
+        this.renderer.drawFrame(this.trackImg, this.car, this.carImg, this.camera, this.track);
     }
 
     loop = () => {

@@ -8,9 +8,11 @@ class Renderer {
         this.fps = 0;
         this.frames = 0;
         this.lastTime = performance.now();
+        // Wall rendering toggle (default OFF for performance)
+        this.showWalls = false;
     }
 
-    drawFrame(trackImg, car, carImg, camera) {
+    drawFrame(trackImg, car, carImg, camera, track = null) {
         // Calculate FPS
         const now = performance.now();
         this.frames++;
@@ -30,6 +32,11 @@ class Renderer {
         // Draw track (no need for background fill, track image covers everything)
         this.ctx.drawImage(trackImg, 0, 0);
         
+        // Draw walls if enabled
+        if (this.showWalls && track) {
+            this.drawWalls(track);
+        }
+        
         // Draw car (which includes sensors)
         car.draw(this.ctx, carImg);
         
@@ -38,6 +45,38 @@ class Renderer {
         
         // Draw HUD info (outside camera transform)
         this.drawHUD(car, camera);
+    }
+
+    drawWalls(track) {
+        const walls = track.getWalls();
+        if (!walls || walls.length === 0) return;
+
+        this.ctx.save();
+        this.ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)'; // Semi-transparent red
+        this.ctx.lineWidth = 1.5;
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+
+        // Batch all walls into a single path for better performance
+        this.ctx.beginPath();
+        
+        for (const wall of walls) {
+            if (wall.polyline && Array.isArray(wall.polyline) && wall.polyline.length >= 2) {
+                this.ctx.moveTo(wall.polyline[0][0], wall.polyline[0][1]);
+                
+                for (let i = 1; i < wall.polyline.length; i++) {
+                    this.ctx.lineTo(wall.polyline[i][0], wall.polyline[i][1]);
+                }
+            }
+        }
+        
+        // Single stroke call for all walls
+        this.ctx.stroke();
+        this.ctx.restore();
+    }
+
+    setShowWalls(show) {
+        this.showWalls = Boolean(show);
     }
 
     drawHUD(car, camera) {
