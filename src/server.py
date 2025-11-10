@@ -175,6 +175,226 @@ def load_track(track_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/tracks/<track_id>/geometry', methods=['GET'])
+def get_geometry(track_id):
+    try:
+        tracks_dir = os.path.join(os.path.dirname(__file__), '..', 'tracks')
+        track_dir = os.path.join(tracks_dir, track_id)
+        geometry_path = os.path.join(track_dir, 'geometry.json')
+        
+        if not os.path.exists(geometry_path):
+            return jsonify({'error': 'Geometry not found'}), 404
+        
+        with open(geometry_path, 'r') as f:
+            geometry = json.load(f)
+        
+        return jsonify(geometry)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/tracks/<track_id>/geometry', methods=['POST'])
+def save_geometry(track_id):
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No JSON data provided'}), 400
+        
+        # Validate the geometry
+        validation_error = validate_geometry(data, track_id)
+        if validation_error:
+            return jsonify({'error': validation_error}), 400
+        
+        tracks_dir = os.path.join(os.path.dirname(__file__), '..', 'tracks')
+        track_dir = os.path.join(tracks_dir, track_id)
+        
+        if not os.path.exists(track_dir):
+            return jsonify({'error': 'Track not found'}), 404
+        
+        geometry_path = os.path.join(track_dir, 'geometry.json')
+        backups_dir = os.path.join(track_dir, 'backups')
+        os.makedirs(backups_dir, exist_ok=True)
+        
+        # Check for optimistic concurrency
+        if os.path.exists(geometry_path):
+            with open(geometry_path, 'r') as f:
+                existing = json.load(f)
+            
+            prev_updated_at = data.get('prevUpdatedAt')
+            if prev_updated_at and existing.get('updatedAt') != prev_updated_at:
+                return jsonify({
+                    'error': 'Track has been modified by another user',
+                    'currentVersion': existing
+                }), 409
+        
+        # Create backup if geometry exists
+        if os.path.exists(geometry_path):
+            timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+            backup_path = os.path.join(backups_dir, f'geometry_{timestamp}.json')
+            shutil.copy2(geometry_path, backup_path)
+        
+        # Update timestamps
+        data['updatedAt'] = datetime.utcnow().isoformat() + 'Z'
+        if 'createdAt' not in data:
+            data['createdAt'] = data['updatedAt']
+        
+        # Atomic write: write to temp file then rename
+        temp_path = geometry_path + '.tmp'
+        with open(temp_path, 'w') as f:
+            json.dump(data, f, indent=2)
+        
+        # On Windows, remove target file if it exists before rename
+        if os.path.exists(geometry_path):
+            os.remove(geometry_path)
+        os.rename(temp_path, geometry_path)
+        
+        # Update meta.json to reference geometry
+        meta_path = os.path.join(track_dir, 'meta.json')
+        if os.path.exists(meta_path):
+            with open(meta_path, 'r') as f:
+                meta = json.load(f)
+            meta['geometry'] = 'geometry.json'
+            with open(meta_path, 'w') as f:
+                json.dump(meta, f, indent=2)
+        
+        # Generate version ID
+        version_id = f"v_{int(datetime.utcnow().timestamp())}"
+        
+        return jsonify({
+            'status': 'ok',
+            'versionId': version_id,
+            'updatedAt': data['updatedAt']
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/tracks/<track_id>/geometry/versions')
+def get_geometry_versions(track_id):
+    try:
+        tracks_dir = os.path.join(os.path.dirname(__file__), '..', 'tracks')
+        track_dir = os.path.join(tracks_dir, track_id)
+        backups_dir = os.path.join(track_dir, 'backups')
+        
+        versions = []
+        if os.path.exists(backups_dir):
+            for filename in os.listdir(backups_dir):
+                if filename.startswith('geometry_') and filename.endswith('.json'):
+                    filepath = os.path.join(backups_dir, filename)
+                    stat = os.stat(filepath)
+                    timestamp_str = filename.replace('geometry_', '').replace('.json', '')
+                    try:
+                        # Parse timestamp from filename
+                        dt = datetime.strptime(timestamp_str, '%Y%m%d_%H%M%S')
+                        versions.append({
+                            'timestamp': dt.isoformat() + 'Z',
+                            'versionId': f"backup_{timestamp_str}",
+                            'author': 'Unknown',  # Could be enhanced to track authors
+                            'message': 'Automatic backup'
+                        })
+                    except ValueError:
+                        continue
+        
+        # Sort by timestamp descending
+        versions.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        return jsonify(versions)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def validate_geometry(geometry, track_id):
+    """Validate geometry JSON structure and data."""
+    required_fields = ['trackId', 'walls', 'checkpoints', 'spawn']
+    for field in required_fields:
+        if field not in geometry:
+            return f"Missing required field: {field}"
+    
+    if geometry['trackId'] != track_id:
+        return "trackId mismatch"
+    
+    # Validate walls
+    if not isinstance(geometry['walls'], list):
+        return "walls must be an array"
+    
+    for i, wall in enumerate(geometry['walls']):
+        if not isinstance(wall, dict) or 'id' not in wall or 'polyline' not in wall:
+            return f"Wall {i} missing id or polyline"
+        if not isinstance(wall['polyline'], list) or len(wall['polyline']) < 2:
+            return f"Wall {i} polyline must have at least 2 points"
+        for j, point in enumerate(wall['polyline']):
+            if not isinstance(point, list) or len(point) != 2:
+                return f"Wall {i} point {j} must be [x,y]"
+            x, y = point
+            if not (isinstance(x, (int, float)) and isinstance(y, (int, float))):
+                return f"Wall {i} point {j} coordinates must be numbers"
+            if not (abs(x) < 100000 and abs(y) < 100000):  # Reasonable bounds
+                return f"Wall {i} point {j} coordinates out of bounds"
+    
+    # Validate checkpoints
+    if not isinstance(geometry['checkpoints'], list):
+        return "checkpoints must be an array"
+    
+    for i, cp in enumerate(geometry['checkpoints']):
+        required_cp_fields = ['id', 'x', 'y', 'angle', 'radius']
+        for field in required_cp_fields:
+            if field not in cp:
+                return f"Checkpoint {i} missing {field}"
+        for field in ['x', 'y', 'angle', 'radius']:
+            if not isinstance(cp[field], (int, float)):
+                return f"Checkpoint {i} {field} must be a number"
+        if not (abs(cp['x']) < 100000 and abs(cp['y']) < 100000):
+            return f"Checkpoint {i} coordinates out of bounds"
+    
+    # Validate spawn
+    if not isinstance(geometry['spawn'], dict):
+        return "spawn must be an object"
+    required_spawn_fields = ['x', 'y', 'angle']
+    for field in required_spawn_fields:
+        if field not in geometry['spawn']:
+            return f"Spawn missing {field}"
+        if not isinstance(geometry['spawn'][field], (int, float)):
+            return f"Spawn {field} must be a number"
+    
+    # Validate startLine if present
+    if 'startLine' in geometry:
+        sl = geometry['startLine']
+        if not isinstance(sl, dict):
+            return "startLine must be an object"
+        required_sl_fields = ['x1', 'y1', 'x2', 'y2', 'angle']
+        for field in required_sl_fields:
+            if field not in sl:
+                return f"StartLine missing {field}"
+            if not isinstance(sl[field], (int, float)):
+                return f"StartLine {field} must be a number"
+    
+    # Sanitize keys and check for nested objects (simple check)
+    def sanitize_dict(d, max_depth=3, current_depth=0):
+        if current_depth > max_depth:
+            return "Object too deeply nested"
+        if isinstance(d, dict):
+            for key, value in list(d.items()):
+                if not isinstance(key, str) or len(key) > 100:
+                    return f"Invalid key: {key}"
+                if isinstance(value, dict):
+                    error = sanitize_dict(value, max_depth, current_depth + 1)
+                    if error:
+                        return error
+                elif isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, dict):
+                            error = sanitize_dict(item, max_depth, current_depth + 1)
+                            if error:
+                                return error
+        return None
+    
+    error = sanitize_dict(geometry)
+    if error:
+        return error
+    
+    return None
+
+
 @app.route('/log_performance', methods=['POST'])
 def log_performance():
     data = request.get_json()

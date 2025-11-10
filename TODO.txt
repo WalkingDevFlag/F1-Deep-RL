@@ -41,3 +41,6 @@ Level Editor:
 Level Editor Upgrades/Fixes:
 1) Fixing the fact that if i upload a PNG then it correctly uploads PNG in the Editor but if i upload a SVG it shows no image available ig
 2) Fixing the Icons on the Dock
+3) Should load the geometry.json for the track. If no geometry means new track. If not then should load old geometry configurations for walls and checkpoints and start/finish
+4) Start Finish Not moving currently
+5) On the Dock, when i click on the button it turns to text and all fix that shit

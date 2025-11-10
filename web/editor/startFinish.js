@@ -151,6 +151,7 @@ export function applyStartFinishMixin(LevelEditor) {
                 undo: () => this.setStartFinish(prevStart, prevSpawn, { pushUndo: false }),
                 description: 'Place Start/Finish'
             });
+            this.markUnsavedChanges();
         }
 
         this.render();

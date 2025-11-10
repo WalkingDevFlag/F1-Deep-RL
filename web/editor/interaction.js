@@ -17,6 +17,10 @@ export function applyInteractionMixin(LevelEditor) {
                         this.redo();
                     } else if (tool === 'pan') {
                         this.togglePanMode();
+                    } else if (tool === 'wall') {
+                        this.extractWalls();
+                    } else if (tool === 'save') {
+                        this.saveGeometry();
                     } else {
                         this.activateTool(tool);
                     }
@@ -76,6 +80,18 @@ export function applyInteractionMixin(LevelEditor) {
 
         this.canvas.addEventListener('mouseleave', () => {
             this.handleMouseUp();
+        });
+
+        // Online/offline detection
+        window.addEventListener('online', () => {
+            this.isOnline = true;
+            this.showToast('Back online', 'success');
+            this.retryPendingSave();
+        });
+
+        window.addEventListener('offline', () => {
+            this.isOnline = false;
+            this.showToast('Offline - saves will be queued', 'info');
         });
     };
 
@@ -176,10 +192,6 @@ export function applyInteractionMixin(LevelEditor) {
                             this.editorState.selectedObject = null;
                         }
                     }
-                } else if (hit.type === 'wall') {
-                    // Re-extract borders when clicking on a wall
-                    this.extractBorders();
-                    this.render();
                 }
                 this.render();
                 return;
@@ -199,10 +211,6 @@ export function applyInteractionMixin(LevelEditor) {
                     this.canvas.style.cursor = 'grabbing';
                 } else if (hit.type === 'line') {
                     this.editorState.selectedObject = 'startLine';
-                    this.render();
-                } else if (hit.type === 'wall') {
-                    // Re-extract borders when clicking on a wall
-                    this.extractBorders();
                     this.render();
                 }
                 return;
@@ -266,8 +274,6 @@ export function applyInteractionMixin(LevelEditor) {
                 if (hit.type === 'handle') {
                     this.canvas.style.cursor = 'grab';
                 } else if (hit.type === 'line') {
-                    this.canvas.style.cursor = 'pointer';
-                } else if (hit.type === 'wall') {
                     this.canvas.style.cursor = 'pointer';
                 }
             } else {

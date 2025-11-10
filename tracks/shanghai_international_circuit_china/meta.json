@@ -4,6 +4,6 @@
   "author": "WalkingDevFlag",
   "original": "original.png",
   "canonical": "canonical.png",
-  "geometry": null,
+  "geometry": "geometry.json",
   "createdAt": "2025-11-09T19:37:17.716118Z"
 }
