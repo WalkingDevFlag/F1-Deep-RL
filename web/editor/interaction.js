@@ -19,6 +19,8 @@ export function applyInteractionMixin(LevelEditor) {
                         this.togglePanMode();
                     } else if (tool === 'wall') {
                         this.extractWalls();
+                    } else if (tool === 'checkpoint') {
+                        this.activateCheckpointTool();
                     } else if (tool === 'save') {
                         this.saveGeometry();
                     } else {
@@ -32,6 +34,9 @@ export function applyInteractionMixin(LevelEditor) {
             if (e.key.toLowerCase() === 's' && !e.ctrlKey && !e.metaKey) {
                 e.preventDefault();
                 this.activateTool('start-finish');
+            } else if (e.key.toLowerCase() === 'c' && !e.ctrlKey && !e.metaKey) {
+                e.preventDefault();
+                this.activateCheckpointTool();
             } else if (e.key.toLowerCase() === 'p' && !e.ctrlKey && !e.metaKey) {
                 e.preventDefault();
                 this.togglePanMode();
@@ -111,7 +116,7 @@ export function applyInteractionMixin(LevelEditor) {
             this.setInteractionMode('pan');
         } else {
             this.setInteractionMode('tool');
-            this.canvas.style.cursor = 'crosshair';
+            this.canvas.style.cursor = toolName === 'checkpoint' ? 'crosshair' : 'crosshair';
         }
 
         this.toolDragging = false;
@@ -119,6 +124,7 @@ export function applyInteractionMixin(LevelEditor) {
         this.isDraggingHandle = false;
         this.dragInitialState = null;
         this.editorState.selectedObject = null;
+        this.editorState.selectedCheckpoints = [];
     };
 
     LevelEditor.prototype.deactivateTool = function deactivateTool(toolName) {
@@ -133,11 +139,19 @@ export function applyInteractionMixin(LevelEditor) {
         if (this.currentTool === 'start-finish') {
             this.toolDragging = false;
             this.render();
+        } else if (this.currentTool === 'checkpoint') {
+            this.toolDragging = false;
+            this.isDraggingCheckpoint = false;
+            this.isDraggingHandle = false;
+            this.selectedHandle = null;
+            this.dragInitialState = null;
+            this.render();
         }
         this.selectedHandle = null;
         this.isDraggingHandle = false;
         this.dragInitialState = null;
         this.editorState.selectedObject = null;
+        this.editorState.selectedCheckpoints = [];
         this.activateTool('select');
     };
 
@@ -173,6 +187,9 @@ export function applyInteractionMixin(LevelEditor) {
             this.dragStartY = worldY;
             this.dragEndX = worldX;
             this.dragEndY = worldY;
+        } else if (this.currentTool === 'checkpoint') {
+            this.onCanvasMouseDown_Checkpoint(e);
+            return;
         } else if (this.currentTool === 'select' || this.currentTool === 'delete') {
             const hit = this.getHitAt(worldX, worldY);
             if (hit) {
@@ -192,11 +209,31 @@ export function applyInteractionMixin(LevelEditor) {
                             this.editorState.selectedObject = null;
                         }
                     }
+                } else if (hit.type === 'checkpoint') {
+                    if (e.shiftKey) {
+                        const index = this.editorState.selectedCheckpoints.indexOf(hit.id);
+                        if (index > -1) {
+                            this.editorState.selectedCheckpoints.splice(index, 1);
+                        } else {
+                            this.editorState.selectedCheckpoints.push(hit.id);
+                        }
+                    } else {
+                        this.editorState.selectedCheckpoints = [hit.id];
+                    }
+                    this.editorState.selectedObject = null;
+                    
+                    if (this.currentTool === 'delete') {
+                        const toDelete = [...this.editorState.selectedCheckpoints];
+                        if (confirm(`Delete ${toDelete.length} checkpoint(s)?`)) {
+                            toDelete.forEach(id => this.deleteCheckpoint(id));
+                        }
+                    }
                 }
                 this.render();
                 return;
             }
             this.editorState.selectedObject = null;
+            this.editorState.selectedCheckpoints = [];
             this.render();
         } else if (this.editorState.startLine) {
             const hit = this.getHitAt(worldX, worldY);
@@ -244,6 +281,9 @@ export function applyInteractionMixin(LevelEditor) {
             this.dragEndX = worldX;
             this.dragEndY = worldY;
             this.render();
+        } else if (this.currentTool === 'checkpoint') {
+            this.onCanvasMouseMove_Checkpoint(e);
+            return;
         } else if (this.isDraggingHandle && this.selectedHandle && this.editorState.startLine) {
             const clampedX = this.trackImage ? Math.max(0, Math.min(this.trackImage.width, worldX)) : worldX;
             const clampedY = this.trackImage ? Math.max(0, Math.min(this.trackImage.height, worldY)) : worldY;
@@ -273,7 +313,7 @@ export function applyInteractionMixin(LevelEditor) {
             if (hit) {
                 if (hit.type === 'handle') {
                     this.canvas.style.cursor = 'grab';
-                } else if (hit.type === 'line') {
+                } else if (hit.type === 'line' || hit.type === 'checkpoint') {
                     this.canvas.style.cursor = 'pointer';
                 }
             } else {
@@ -286,6 +326,9 @@ export function applyInteractionMixin(LevelEditor) {
         if (this.currentTool === 'start-finish' && this.toolDragging) {
             this.toolDragging = false;
             this.placeStartFinish(this.dragStartX, this.dragStartY, this.dragEndX, this.dragEndY);
+        } else if (this.currentTool === 'checkpoint') {
+            this.onCanvasMouseUp_Checkpoint();
+            return;
         } else if (this.isDraggingHandle) {
             this.isDraggingHandle = false;
             const handle = this.selectedHandle;

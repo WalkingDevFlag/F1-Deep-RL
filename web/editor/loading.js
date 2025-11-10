@@ -196,6 +196,7 @@ export function applyLoadingMixin(LevelEditor) {
         // Reset undo/redo stacks
         this.undoStack = [];
         this.redoStack = [];
+        this.editorState.selectedCheckpoints = [];
 
         // Initialize view and show editor
         this.initializeView();

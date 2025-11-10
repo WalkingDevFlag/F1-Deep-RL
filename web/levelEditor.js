@@ -4,6 +4,7 @@ import { applyLoadingMixin } from './editor/loading.js';
 import { applyPersistenceMixin } from './editor/persistence.js';
 import { applyRenderingMixin } from './editor/rendering.js';
 import { applyStartFinishMixin } from './editor/startFinish.js';
+import { applyCheckpointsMixin } from './editor/checkpoints.js';
 
 class LevelEditor {
 	constructor() {
@@ -19,6 +20,7 @@ class LevelEditor {
 			startLine: null,
 			spawn: null,
 			selectedObject: null,
+			selectedCheckpoints: [],
 			walls: [],
 			checkpoints: [],
 			uiToggles: {
@@ -51,6 +53,10 @@ class LevelEditor {
 		this.selectedHandle = null;
 		this.isDraggingHandle = false;
 		this.dragInitialState = null;
+
+		this.isDraggingCheckpoint = false;
+		this.draggingCheckpointId = null;
+		this.draggingHandleId = null;
 
 		this.autoSaveInterval = null;
 		this.hasUnsavedChanges = false;
@@ -135,7 +141,7 @@ class LevelEditor {
 			this.initializeView();
 		}
 
-		const implementedTools = ['pan', 'select', 'wall', 'start-finish', 'delete', 'undo', 'redo', 'save'];
+		        const implementedTools = ['pan', 'select', 'wall', 'start-finish', 'checkpoint', 'delete', 'undo', 'redo', 'save'];
 		if (this.dock) {
 			implementedTools.forEach((tool) => {
 				const button = this.dock.querySelector(`[data-tool="${tool}"]`);
@@ -219,6 +225,7 @@ applyRenderingMixin(LevelEditor);
 applyInteractionMixin(LevelEditor);
 applyLoadingMixin(LevelEditor);
 applyPersistenceMixin(LevelEditor);
+applyCheckpointsMixin(LevelEditor);
 
 const levelEditor = new LevelEditor();
 levelEditor.initialize();

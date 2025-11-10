@@ -25,8 +25,10 @@ export function applyPersistenceMixin(LevelEditor) {
                 id: cp.id || `CP${index + 1}`,
                 x: Math.round(cp.x),
                 y: Math.round(cp.y),
-                angle: cp.angle,
-                radius: cp.radius || 20
+                width: Math.round(cp.width),
+                height: Math.round(cp.height),
+                angle: cp.angle || 0,
+                radius: cp.radius || 0
             })),
             walls: this.editorState.walls.map((wall, index) => ({
                 id: wall.id || `wall_${index + 1}`,

@@ -20,6 +20,11 @@ export function applyRenderingMixin(LevelEditor) {
             }
 
             this.drawWalls();
+            this.renderCheckpoints();
+
+            if (this.currentTool === 'checkpoint' && this.toolDragging) {
+                this.drawCheckpointPreview();
+            }
 
             this.ctx.restore();
         } else {

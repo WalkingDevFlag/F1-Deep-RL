@@ -91,6 +91,12 @@ export function applyStartFinishMixin(LevelEditor) {
             }
         }
 
+        // Check checkpoints
+        const checkpointHit = this.hitTestCheckpoint(worldX, worldY);
+        if (checkpointHit) {
+            return checkpointHit;
+        }
+
         return null;
     };
 
@@ -216,6 +222,14 @@ export function applyStartFinishMixin(LevelEditor) {
             if (confirm('Delete selected Start/Finish line?')) {
                 this.removeStartFinish();
                 this.editorState.selectedObject = null;
+            }
+        } else if (this.editorState.selectedCheckpoints.length > 0) {
+            const count = this.editorState.selectedCheckpoints.length;
+            if (confirm(`Delete ${count} selected checkpoint${count > 1 ? 's' : ''}?`)) {
+                for (const id of [...this.editorState.selectedCheckpoints]) {
+                    this.deleteCheckpoint(id);
+                }
+                this.editorState.selectedCheckpoints = [];
             }
         }
     };
