@@ -209,6 +209,59 @@ class LevelEditor {
 
 	// showLoadingOverlay and hideLoadingOverlay are provided via applyLoadingMixin.
 
+	showWallExtractionOverlay() {
+		let overlay = document.getElementById('wall-extraction-overlay');
+		if (!overlay) {
+			overlay = document.createElement('div');
+			overlay.id = 'wall-extraction-overlay';
+			overlay.style.cssText = `
+				position: fixed;
+				top: 0;
+				left: 0;
+				width: 100%;
+				height: 100%;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: rgba(0, 0, 0, 0.4);
+				z-index: 10000;
+				color: #fff;
+				font-size: 20px;
+				flex-direction: column;
+			`;
+			const spinner = document.createElement('div');
+			spinner.style.cssText = `
+				width: 48px;
+				height: 48px;
+				border-radius: 50%;
+				border: 4px solid rgba(255, 255, 255, 0.3);
+				border-top-color: #fff;
+				animation: wall-extraction-spin 1s linear infinite;
+				margin-bottom: 12px;
+			`;
+			overlay.appendChild(spinner);
+			const label = document.createElement('div');
+			label.textContent = 'Extracting walls...';
+			overlay.appendChild(label);
+
+			// Inject keyframes only once
+			if (!document.getElementById('wall-extraction-style')) {
+				const style = document.createElement('style');
+				style.id = 'wall-extraction-style';
+				style.textContent = `
+					@keyframes wall-extraction-spin {
+						0% { transform: rotate(0deg); }
+						100% { transform: rotate(360deg); }
+					}
+				`;
+				document.head.appendChild(style);
+			}
+
+			document.body.appendChild(overlay);
+		}
+		overlay.style.display = 'flex';
+	}
+
 	hideWallExtractionOverlay() {
 		const overlay = document.getElementById('wall-extraction-overlay');
 		if (overlay) {
