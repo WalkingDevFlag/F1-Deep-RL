@@ -2,7 +2,7 @@
   "version": 1,
   "trackId": "albert_park_circuit_melbourne_track_transparent",
   "createdAt": "2025-11-09T18:13:04.525023Z",
-  "updatedAt": "2025-11-10T11:56:17.411576Z",
+  "updatedAt": "2025-11-10T11:53:42.810832Z",
   "spawn": {
     "x": 7792,
     "y": 8145,
@@ -133,96 +133,6 @@
       "width": 382,
       "height": 38,
       "angle": 1.5310987354268786,
-      "radius": 0
-    },
-    {
-      "id": "CP15",
-      "x": 13241,
-      "y": 5748,
-      "width": 392,
-      "height": 42,
-      "angle": -1.0326114079517725,
-      "radius": 0
-    },
-    {
-      "id": "CP16",
-      "x": 13433,
-      "y": 6106,
-      "width": 378,
-      "height": 37,
-      "angle": 0.5338588531213655,
-      "radius": 0
-    },
-    {
-      "id": "CP17",
-      "x": 12901,
-      "y": 7036,
-      "width": 375,
-      "height": 47,
-      "angle": 0.3765439011160372,
-      "radius": 0
-    },
-    {
-      "id": "CP18",
-      "x": 12377,
-      "y": 7321,
-      "width": 55,
-      "height": 373,
-      "angle": 0.2382874884263646,
-      "radius": 0
-    },
-    {
-      "id": "CP19",
-      "x": 11517,
-      "y": 7104,
-      "width": 377,
-      "height": 55,
-      "angle": -1.3727718321717957,
-      "radius": 0
-    },
-    {
-      "id": "CP20",
-      "x": 11179,
-      "y": 7291,
-      "width": 383,
-      "height": 52,
-      "angle": 0,
-      "radius": 0
-    },
-    {
-      "id": "CP21",
-      "x": 11208,
-      "y": 7743,
-      "width": 393,
-      "height": 33,
-      "angle": 0,
-      "radius": 0
-    },
-    {
-      "id": "CP22",
-      "x": 10827,
-      "y": 8070,
-      "width": 55,
-      "height": 413,
-      "angle": 0,
-      "radius": 0
-    },
-    {
-      "id": "CP23",
-      "x": 8988,
-      "y": 8125,
-      "width": 33,
-      "height": 411,
-      "angle": 0,
-      "radius": 0
-    },
-    {
-      "id": "CP24",
-      "x": 7440,
-      "y": 8135,
-      "width": 78,
-      "height": 440,
-      "angle": 0,
       "radius": 0
     }
   ],

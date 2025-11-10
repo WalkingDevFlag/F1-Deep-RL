@@ -44,3 +44,20 @@ Level Editor Upgrades/Fixes:
 3) Should load the geometry.json for the track. If no geometry means new track. If not then should load old geometry configurations for walls and checkpoints and start/finish
 4) Start Finish Not moving currently
 5) On the Dock, when i click on the button it turns to text and all fix that shit
+6) Allow me to Rename the Track by clicking on the top left text editing it over there
+7) Erase Wall Borders
+
+Bugs:
+web/levelEditor.js: setWallExtractionState calls this.showWallExtractionOverlay() (around the wall extraction toggle), but no such method exists anywhere in the editor mixins—invoking wall extraction currently explodes with a TypeError before any work is done.
+web/car.js: update() integrates acceleration with deltaTime, yet the actual displacement (moveX/moveY) ignores deltaTime, so car speed halves on a 30 FPS machine and doubles on 120 FPS; you already pass deltaTime in but never apply it to the translation.
+web/car.js: the boundary clamp still uses the constructor defaults (this.width/this.height) instead of the scaled sprite dimensions from setCarImage; the center is forced at least 32 px/16 px from the edges even if the actual car is wider, making the car feel like it hits invisible walls and still allowing rendered geometry to stick out.
+web/editor/persistence.js: setSavingState rewrites saveButton.textContent to “Saving…”/“Save”, stripping the SVG icon/label/tooltip elements permanently—after the first save the button loses all styling and accessibility structure.
+web/index.html: there is a duplicated ui-dock__items block (the level-editor tool buttons) dropped inside the script section along with stray </nav></div> closers; the page renders invalid DOM and those dead buttons sit in the document tree.
+
+Optimizations:
+car.js: extractCarPolygon runs a full image scan on every load (nested loops + neighbor checks across every pixel) producing thousands of points; consider precomputing a simplified outline or using a marching-squares style contour to avoid heavy per-frame transforms and collision checks with oversized polygons.
+car.js: assessDamage steps over every pixel on each polygon edge every frame; a coarse spatial grid or sampling reduction would cut the O(pixels) cost that currently scales with car perimeter and FPS.
+track.js: both extractBorders and findSafeSpawnPoint repeatedly call getImageData and perform large nested loops on the full bitmap; caching the alpha mask once and reusing it (or running extraction on the server/off-thread) would drop the editor/game startup time significantly.
+checkpoints.js: resizing invokes Math.round and trigonometric conversions on every mousemove; tracking deltas in screen space and applying once on mouseup would eliminate the high-frequency trig/allocations.
+renderer.js: drawWalls rebuilds the full path each frame even when geometry is static; caching a Path2D per wall set and reusing it during strokes would reduce draw overhead when wall rendering is toggled on.
+assetLoader.js: loadAssets creates a Promise wrapper around async/await, and the two image onload handlers duplicate resolve logic; leveraging Promise.all on trackImg.decode()/carImg.decode() would simplify and avoid multiple resolve calls.
