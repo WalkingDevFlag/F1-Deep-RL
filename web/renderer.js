@@ -10,6 +10,8 @@ class Renderer {
         this.lastTime = performance.now();
         // Wall rendering toggle (default OFF for performance)
         this.showWalls = false;
+        // Checkpoint rendering toggle (default OFF for performance)
+        this.showCheckpoints = false;
     }
 
     drawFrame(trackImg, car, carImg, camera, track = null) {
@@ -35,6 +37,11 @@ class Renderer {
         // Draw walls if enabled
         if (this.showWalls && track) {
             this.drawWalls(track);
+        }
+        
+        // Draw checkpoints if enabled
+        if (this.showCheckpoints && track) {
+            this.drawCheckpoints(track);
         }
         
         // Draw car (which includes sensors)
@@ -75,8 +82,42 @@ class Renderer {
         this.ctx.restore();
     }
 
+    drawCheckpoints(track) {
+        const checkpoints = track.getCheckpoints();
+        if (!checkpoints || checkpoints.length === 0) return;
+
+        this.ctx.save();
+        this.ctx.strokeStyle = 'rgba(0, 128, 0, 0.7)'; // Semi-transparent green
+        this.ctx.lineWidth = 2;
+        this.ctx.lineCap = 'round';
+        this.ctx.lineJoin = 'round';
+
+        for (const checkpoint of checkpoints) {
+            this.ctx.save();
+            this.ctx.translate(checkpoint.x, checkpoint.y);
+            this.ctx.rotate(checkpoint.angle);
+
+            // Draw rectangle outline
+            this.ctx.strokeRect(-checkpoint.width / 2, -checkpoint.height / 2, checkpoint.width, checkpoint.height);
+
+            // Draw checkpoint ID label
+            this.ctx.fillStyle = 'rgba(0, 128, 0, 0.9)';
+            this.ctx.font = '14px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText(checkpoint.id.toString(), 0, -checkpoint.height / 2 - 8);
+
+            this.ctx.restore();
+        }
+
+        this.ctx.restore();
+    }
+
     setShowWalls(show) {
         this.showWalls = Boolean(show);
+    }
+
+    setShowCheckpoints(show) {
+        this.showCheckpoints = Boolean(show);
     }
 
     drawHUD(car, camera) {

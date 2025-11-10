@@ -787,8 +787,17 @@ class Game {
                 }
             }
         });
+        const checkpointsRow = createToggleRow({
+            label: 'Checkpoints',
+            initial: this.renderer ? this.renderer.showCheckpoints : false,
+            onToggle: (enabled) => {
+                if (this.renderer) {
+                    this.renderer.setShowCheckpoints(enabled);
+                }
+            }
+        });
 
-        hudCard.addMany([fpsRow, cameraRow, sensorsRow, nnRow, wallsRow]);
+        hudCard.addMany([fpsRow, cameraRow, sensorsRow, nnRow, wallsRow, checkpointsRow]);
         if (document.body) {
             document.body.appendChild(hudCard.element);
         }
@@ -855,6 +864,7 @@ class Game {
             sensorsRow,
             nnRow,
             wallsRow,
+            checkpointsRow,
             dock: {
                 element: dockElementRef,
                 homeButton: homeButtonRef,
@@ -905,6 +915,16 @@ class Game {
             const rendererWallsState = this.renderer.showWalls;
             if (currentWallsState !== rendererWallsState) {
                 this.uiElements.wallsRow.setChecked(rendererWallsState, { silent: true });
+            }
+        }
+
+        if (this.uiElements.checkpointsRow && typeof this.uiElements.checkpointsRow.setChecked === 'function' && this.renderer) {
+            const currentCheckpointsState = typeof this.uiElements.checkpointsRow.getChecked === 'function'
+                ? this.uiElements.checkpointsRow.getChecked()
+                : null;
+            const rendererCheckpointsState = this.renderer.showCheckpoints;
+            if (currentCheckpointsState !== rendererCheckpointsState) {
+                this.uiElements.checkpointsRow.setChecked(rendererCheckpointsState, { silent: true });
             }
         }
     }
