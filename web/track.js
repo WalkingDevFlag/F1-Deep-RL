@@ -1,13 +1,17 @@
 // Track spawn point management
 
 class Track {
-    constructor(trackImg, offscreenCtx, carWidth, carHeight) {
+    constructor(trackImg, offscreenCtx, carWidth, carHeight, trackMeta) {
         this.trackImg = trackImg;
         this.offscreenCtx = offscreenCtx;
         this.carWidth = carWidth;
         this.carHeight = carHeight;
+        this.trackMeta = trackMeta;
         this.spawnPoint = { x: 400, y: 300, angle: 0 };
         this.borders = [];
+        this.checkpoints = [];
+        this.walls = [];
+        this.geometryLoaded = false;
     }
 
     extractBorders() {
@@ -173,11 +177,93 @@ class Track {
         return { x: centerX, y: centerY, angle: 0 };
     }
 
-    initialize() {
-        this.extractBorders();
-        this.spawnPoint = this.findSafeSpawnPoint();
+    async initialize() {
+        // Try to load geometry.json first
+        const geometryLoaded = await this.loadGeometry();
+        
+        if (!geometryLoaded) {
+            // Fallback to border extraction
+            console.log('Geometry not found, extracting borders from image...');
+            this.extractBorders();
+            this.spawnPoint = this.findSafeSpawnPoint();
+        }
+        
+        console.log('Track initialized. Geometry loaded:', this.geometryLoaded);
         console.log('Found spawn point:', this.spawnPoint);
         return this.spawnPoint;
+    }
+
+    async loadGeometry() {
+        if (!this.trackMeta || !this.trackMeta.id) {
+            return false;
+        }
+
+        try {
+            const response = await fetch(`/tracks/${this.trackMeta.id}/geometry`);
+            if (!response.ok) {
+                if (response.status === 404) {
+                    console.log('No geometry.json found for track:', this.trackMeta.id);
+                } else {
+                    console.warn('Failed to load geometry:', response.status);
+                }
+                return false;
+            }
+
+            const geometry = await response.json();
+            
+            // Validate geometry structure
+            if (!this.validateGeometry(geometry)) {
+                console.warn('Invalid geometry structure, falling back to extraction');
+                return false;
+            }
+
+            // Apply geometry
+            this.applyGeometry(geometry);
+            this.geometryLoaded = true;
+            console.log('Loaded geometry from geometry.json');
+            return true;
+            
+        } catch (error) {
+            console.error('Error loading geometry:', error);
+            return false;
+        }
+    }
+
+    validateGeometry(geometry) {
+        if (!geometry || typeof geometry !== 'object') return false;
+        if (!geometry.walls || !Array.isArray(geometry.walls)) return false;
+        if (!geometry.checkpoints || !Array.isArray(geometry.checkpoints)) return false;
+        if (!geometry.spawn || typeof geometry.spawn !== 'object') return false;
+        return true;
+    }
+
+    applyGeometry(geometry) {
+        // Convert geometry walls to borders format expected by car physics
+        this.borders = [];
+        this.walls = geometry.walls;
+        
+        // Convert walls to borders (flatten polylines into line segments)
+        for (const wall of geometry.walls) {
+            if (wall.polyline && Array.isArray(wall.polyline)) {
+                for (let i = 0; i < wall.polyline.length - 1; i++) {
+                    const p1 = wall.polyline[i];
+                    const p2 = wall.polyline[i + 1];
+                    this.borders.push([p1, p2]);
+                }
+            }
+        }
+
+        // Set checkpoints
+        this.checkpoints = geometry.checkpoints;
+
+        // Set spawn point
+        this.spawnPoint = {
+            x: geometry.spawn.x,
+            y: geometry.spawn.y,
+            angle: geometry.spawn.angle || 0
+        };
+
+        console.log(`Applied geometry: ${this.borders.length} border segments, ${this.checkpoints.length} checkpoints`);
     }
 
     getSpawnPoint() {
@@ -186,5 +272,17 @@ class Track {
 
     getBorders() {
         return this.borders;
+    }
+
+    getWalls() {
+        return this.walls;
+    }
+
+    getCheckpoints() {
+        return this.checkpoints;
+    }
+
+    isGeometryLoaded() {
+        return this.geometryLoaded;
     }
 }

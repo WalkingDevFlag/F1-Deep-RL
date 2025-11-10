@@ -1,0 +1,46 @@
+Things to add:		
+1) Generation Count
+2) Full Body Sensors
+3) Resume Training Logic
+4) Other Tracks
+5) Level / Track Editing Tool to edit tracks (Checkpoints, start and finish, walls, etc)
+6) Add unit tests
+
+Monitoring, logging, and checkpoints
+1) Fix Path outputs for model checkpoints and zip files
+2) Integrate TensorBoard logging, model checkpoint callback, and save episode metrics (reward components, steps-to-crash, lap times).
+
+
+Reward Policy:
+1) Checkpoint Functionality in Tracks
+2) Start and Finish in Tracks
+3) Laps System
+4) Timing Per Lap
+5) New reward policies & penalties:
+- Positive rewards (encourage behaviour):
+	1) Forward speed reward — keep your existing +k * speed (encourages forward motion).
+	2) Clearance reward — reward proportional to mean sensor distance (staying away from walls).
+	?) Centeredness reward — reward when left/right sensor means are similar (stay in the middle of the lane).
+	3) Heading stability reward — small reward for small change in heading between steps (discourages violent oscillation).
+	4) Progress / checkpoint reward — sparse + small dense reward for getting closer to the next checkpoint or passing one (the true 	   task objective).
+- Penalties (discourage bad behaviour):
+	1) Collision penalty — large negative when car.damaged becomes true (already have −1.0; keep or increase).
+	2) Time penalty — tiny negative each step (avoid dithering / spinning in place).
+	3) Steering-change penalty — small penalty for changing discrete action frequently (encourages smooth control).
+	4) Reverse / negative-speed penalty — penalize backwards motion if not needed.
+	5) Off-track timeout / stuck penalty — if car doesn’t move sufficiently for N steps, apply penalty and reset.
+
+Level Editor:
+1) Create a simple level editor to design and test new tracks quickly.
+2) Allow placing checkpoints, start/finish lines, walls, and other track features.
+3) Save and load track designs for training and evaluation.
+4) Allow to upload custom tracks via the web interface.
+
+
+
+Level Editor Upgrades/Fixes:
+1) Fixing the fact that if i upload a PNG then it correctly uploads PNG in the Editor but if i upload a SVG it shows no image available ig
+2) Fixing the Icons on the Dock
+3) Should load the geometry.json for the track. If no geometry means new track. If not then should load old geometry configurations for walls and checkpoints and start/finish
+4) Start Finish Not moving currently
+5) On the Dock, when i click on the button it turns to text and all fix that shit

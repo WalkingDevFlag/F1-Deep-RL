@@ -1,60 +1,35 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang='en'>
 <head>
     <meta charset='UTF-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-    <title>F1 Manual Driving</title>
+    <title>F1 Level Editor</title>
     <link rel="stylesheet" href="ui/ui.css">
 </head>
 <body>
-    <canvas id="canvas"></canvas>
-
-    <nav id="main-dock" class="ui-dock" data-align="bottom" role="toolbar" aria-label="Simulator dock" data-persistent="true">
-        <div class="ui-dock__items">
-            <button type="button" class="ui-dock__button" data-dock-action="home" aria-label="Go to dashboard">
-                <span class="ui-dock__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 11l9-7 9 7"></path>
-                        <path d="M5 10v10h14V10"></path>
-                        <path d="M9 21V12h6v9"></path>
-                    </svg>
-                </span>
-                <span class="ui-dock__label">Home</span>
-                <span class="ui-dock__tooltip">Home</span>
-            </button>
-            <button type="button" class="ui-dock__button" data-dock-action="editor" aria-label="Open Level Editor">
-                <span class="ui-dock__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 4h6v6H4z"></path>
-                        <path d="M14 4h6v6h-6z"></path>
-                        <path d="M4 14h6v6H4z"></path>
-                        <path d="M18.5 13.5l-5 5V21h2.5l5-5z"></path>
-                    </svg>
-                </span>
-                <span class="ui-dock__label">Level Editor</span>
-                <span class="ui-dock__tooltip">Level Editor</span>
-            </button>
-        </div>
-    </nav>
-
-    <div id="editor-modal" class="editor-modal" role="dialog" aria-modal="true" aria-labelledby="editor-modal-title" aria-describedby="editor-modal-description" aria-hidden="true" hidden>
-        <section class="ui-card editor-modal__content" role="document" tabindex="-1">
-            <button type="button" class="editor-modal__close" aria-label="Close editor modal" data-editor-close>&times;</button>
-            <h2 class="ui-card__title" id="editor-modal-title">Create or Edit a Track</h2>
-            <div class="ui-card__body">
-                <p class="editor-modal__lead" id="editor-modal-description">Load an existing layout or upload a fresh build to start crafting your circuit.</p>
-                <div class="editor-modal__actions">
-                    <button type="button" class="editor-modal__action" data-editor-action="load">Load Existing</button>
-                    <button type="button" class="editor-modal__action editor-modal__action--secondary" data-editor-action="upload">Upload New Track</button>
-                </div>
-                <p class="editor-modal__hint">Bring your best racing lines&mdash;the track builder is warming up.</p>
-            </div>
-        </section>
-    </div>
-
-    <!-- Utility modules -->
+    <!-- Level Editor -->
+    <div id="level-editor" class="level-editor">
+        <!-- Editor HUD Card (added by JS) -->
+        <div id="editorHudCard"></div>
+        
+        <canvas id="editor-canvas" class="level-editor__canvas"></canvas>
+        
+        <nav id="level-editor-dock" class="ui-dock" data-align="bottom" role="toolbar" aria-label="Level Editor dock">
             <div class="ui-dock__items">
-                <button type="button" class="ui-dock__button level-editor__tool" disabled title="Select Tool">
+                <button type="button" class="ui-dock__button" disabled data-tool="pan" aria-label="Pan/Zoom Mode">
+                    <span class="ui-dock__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 9l-3 3 3 3"></path>
+                            <path d="M9 5l3-3 3 3"></path>
+                            <path d="M15 9l3-3 3 3"></path>
+                            <path d="M9 15l-3 3-3-3"></path>
+                            <path d="M12 12h.01"></path>
+                        </svg>
+                    </span>
+                    <span class="ui-dock__label">Pan/Zoom</span>
+                    <span class="ui-dock__tooltip">Pan/Zoom</span>
+                </button>
+                <button type="button" class="ui-dock__button" disabled data-tool="select" aria-label="Select Tool">
                     <span class="ui-dock__icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M5 4l6 16 2-6 6 3z"></path>
@@ -63,7 +38,7 @@
                     <span class="ui-dock__label">Select</span>
                     <span class="ui-dock__tooltip">Select</span>
                 </button>
-                <button type="button" class="ui-dock__button level-editor__tool" disabled title="Checkpoint Tool">
+                <button type="button" class="ui-dock__button" disabled data-tool="checkpoint" aria-label="Checkpoint Tool">
                     <span class="ui-dock__icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M6 4v16"></path>
@@ -73,7 +48,7 @@
                     <span class="ui-dock__label">Checkpoint</span>
                     <span class="ui-dock__tooltip">Checkpoint</span>
                 </button>
-                <button type="button" class="ui-dock__button level-editor__tool" disabled title="Start/Finish Tool">
+                <button type="button" class="ui-dock__button" disabled data-tool="start-finish" aria-label="Start/Finish Tool">
                     <span class="ui-dock__icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M5 4v16"></path>
@@ -86,7 +61,7 @@
                     <span class="ui-dock__label">Start/Finish</span>
                     <span class="ui-dock__tooltip">Start/Finish</span>
                 </button>
-                <button type="button" class="ui-dock__button level-editor__tool" disabled title="Wall Tool">
+                <button type="button" class="ui-dock__button" disabled data-tool="wall" aria-label="Wall Tool">
                     <span class="ui-dock__icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <rect x="4" y="8" width="16" height="8" rx="2"></rect>
@@ -97,7 +72,7 @@
                     <span class="ui-dock__label">Wall</span>
                     <span class="ui-dock__tooltip">Wall</span>
                 </button>
-                <button type="button" class="ui-dock__button level-editor__tool" disabled title="Delete Tool">
+                <button type="button" class="ui-dock__button" disabled data-tool="delete" aria-label="Delete Tool">
                     <span class="ui-dock__icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M6 7h12"></path>
@@ -110,7 +85,7 @@
                     <span class="ui-dock__label">Delete</span>
                     <span class="ui-dock__tooltip">Delete</span>
                 </button>
-                <button type="button" class="ui-dock__button level-editor__tool" disabled title="Undo">
+                <button type="button" class="ui-dock__button" disabled data-tool="undo" aria-label="Undo">
                     <span class="ui-dock__icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M9 8l-4 4 4 4"></path>
@@ -120,7 +95,7 @@
                     <span class="ui-dock__label">Undo</span>
                     <span class="ui-dock__tooltip">Undo</span>
                 </button>
-                <button type="button" class="ui-dock__button level-editor__tool" disabled title="Redo">
+                <button type="button" class="ui-dock__button" disabled data-tool="redo" aria-label="Redo">
                     <span class="ui-dock__icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M15 8l4 4-4 4"></path>
@@ -130,7 +105,7 @@
                     <span class="ui-dock__label">Redo</span>
                     <span class="ui-dock__tooltip">Redo</span>
                 </button>
-                <button type="button" class="ui-dock__button level-editor__tool" disabled title="Test Drive">
+                <button type="button" class="ui-dock__button" disabled data-tool="test" aria-label="Test Drive">
                     <span class="ui-dock__icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M5 16l2-5h10l2 5"></path>
@@ -142,7 +117,7 @@
                     <span class="ui-dock__label">Test Drive</span>
                     <span class="ui-dock__tooltip">Test Drive</span>
                 </button>
-                <button type="button" class="ui-dock__button level-editor__tool" disabled title="Save Track">
+                <button type="button" class="ui-dock__button" disabled data-tool="save" aria-label="Save Track">
                     <span class="ui-dock__icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M5 5h12l2 3v11H5z"></path>
@@ -153,61 +128,16 @@
                     <span class="ui-dock__label">Save</span>
                     <span class="ui-dock__tooltip">Save</span>
                 </button>
-                <button type="button" class="ui-dock__button level-editor__tool" disabled title="Export Track">
-                    <span class="ui-dock__icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 3v12"></path>
-                            <path d="M8 7l4-4 4 4"></path>
-                            <path d="M5 15h14v6H5z"></path>
-                        </svg>
-                    </span>
-                    <span class="ui-dock__label">Export</span>
-                    <span class="ui-dock__tooltip">Export</span>
-                </button>
-                <button type="button" class="ui-dock__button level-editor__tool" disabled title="Exit Editor">
-                    <span class="ui-dock__icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M10 4H5v16h5"></path>
-                            <path d="M15 12H8"></path>
-                            <path d="M15 12l3-3"></path>
-                            <path d="M15 12l3 3"></path>
-                        </svg>
-                    </span>
-                    <span class="ui-dock__label">Exit</span>
-                    <span class="ui-dock__tooltip">Exit</span>
-                </button>
             </div>
         </nav>
     </div>
 
     <!-- Utility modules -->
     <script src="utils.js" defer></script>
-    
-    <!-- Sensor module -->
-    <script src="sensor.js" defer></script>
-    
-    <!-- Car module -->
-    <script src="car.js" defer></script>
-    
-    <!-- Controls module -->
-    <script src="controls.js" defer></script>
-    
-    <!-- Track module -->
-    <script src="track.js" defer></script>
-    
-    <!-- Camera module -->
-    <script src="camera.js" defer></script>
-    
-    <!-- Renderer module -->
-    <script src="renderer.js" defer></script>
-    
-    <!-- Asset loader module -->
-    <script src="assetLoader.js" defer></script>
 
     <!-- UI helper modules -->
     <script src="ui/base.js" defer></script>
     <script src="ui/card.js" defer></script>
-    <script src="ui/stat-row.js" defer></script>
     <script src="ui/toggle-row.js" defer></script>
     <script src="ui/dock.js" defer></script>
     <script src="ui/dock-button.js" defer></script>
@@ -215,8 +145,5 @@
     
     <!-- Level Editor module -->
     <script type="module" src="levelEditor.js"></script>
-    
-    <!-- Main game logic -->
-    <script src="main.js" defer></script>
 </body>
 </html>
