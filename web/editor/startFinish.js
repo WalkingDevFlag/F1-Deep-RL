@@ -49,29 +49,44 @@ export function applyStartFinishMixin(LevelEditor) {
         if (this.editorState.walls) {
             for (let i = 0; i < this.editorState.walls.length; i++) {
                 const wall = this.editorState.walls[i];
-                const wx1 = wall[0].x;
-                const wy1 = wall[0].y;
-                const wx2 = wall[1].x;
-                const wy2 = wall[1].y;
+                let segments = [];
 
-                const wallLength = Math.hypot(wx2 - wx1, wy2 - wy1);
-                if (wallLength === 0) {
-                    continue;
+                if (wall.polyline) {
+                    // Loaded geometry: polyline array
+                    const points = wall.polyline;
+                    for (let j = 0; j < points.length - 1; j++) {
+                        segments.push([points[j], points[j + 1]]);
+                    }
+                } else if (Array.isArray(wall) && wall.length >= 2) {
+                    // Extracted borders: single segment
+                    segments.push(wall);
                 }
 
-                const wdx = wx2 - wx1;
-                const wdy = wy2 - wy1;
-                const wpx = worldX - wx1;
-                const wpy = worldY - wy1;
-                const wdot = wpx * wdx + wpy * wdy;
-                const wproj = wdot / (wallLength * wallLength);
-                const wclampedProj = Math.max(0, Math.min(1, wproj));
-                const wclosestX = wx1 + wclampedProj * wdx;
-                const wclosestY = wy1 + wclampedProj * wdy;
-                const distToWall = Math.hypot(worldX - wclosestX, worldY - wclosestY);
+                for (const segment of segments) {
+                    const wx1 = segment[0].x;
+                    const wy1 = segment[0].y;
+                    const wx2 = segment[1].x;
+                    const wy2 = segment[1].y;
 
-                if (distToWall <= threshold) {
-                    return { type: 'wall', index: i };
+                    const wallLength = Math.hypot(wx2 - wx1, wy2 - wy1);
+                    if (wallLength === 0) {
+                        continue;
+                    }
+
+                    const wdx = wx2 - wx1;
+                    const wdy = wy2 - wy1;
+                    const wpx = worldX - wx1;
+                    const wpy = worldY - wy1;
+                    const wdot = wpx * wdx + wpy * wdy;
+                    const wproj = wdot / (wallLength * wallLength);
+                    const wclampedProj = Math.max(0, Math.min(1, wproj));
+                    const wclosestX = wx1 + wclampedProj * wdx;
+                    const wclosestY = wy1 + wclampedProj * wdy;
+                    const distToWall = Math.hypot(worldX - wclosestX, worldY - wclosestY);
+
+                    if (distToWall <= threshold) {
+                        return { type: 'wall', index: i };
+                    }
                 }
             }
         }

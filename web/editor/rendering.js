@@ -98,8 +98,23 @@ export function applyRenderingMixin(LevelEditor) {
         this.ctx.beginPath();
 
         for (const wall of this.editorState.walls) {
-            this.ctx.moveTo(wall[0].x, wall[0].y);
-            this.ctx.lineTo(wall[1].x, wall[1].y);
+            let points;
+            if (wall.polyline) {
+                // Loaded geometry format: object with polyline
+                points = wall.polyline;
+            } else if (Array.isArray(wall) && wall.length >= 2) {
+                // Extracted borders format: array of points
+                points = wall;
+            } else {
+                continue; // Skip invalid walls
+            }
+
+            if (points.length < 2) continue;
+
+            this.ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                this.ctx.lineTo(points[i].x, points[i].y);
+            }
         }
 
         this.ctx.stroke();

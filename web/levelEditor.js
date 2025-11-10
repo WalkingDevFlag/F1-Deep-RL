@@ -75,99 +75,201 @@ class LevelEditor {
 
 	async loadTrackById(trackId) {
 		try {
-			const response = await fetch(`/tracks/load/${trackId}`);
-			const meta = await response.json();
-			if (meta.error) {
-				alert('Error loading track: ' + meta.error);
+			// Show loading overlay
+			this.showLoadingOverlay();
+
+			// First, try to fetch geometry.json
+			let geometry = null;
+			let meta = null;
+			let imageUrl = null;
+
+			try {
+				const geometryResponse = await fetch(`/tracks/${trackId}/geometry`);
+				if (geometryResponse.ok) {
+					geometry = await geometryResponse.json();
+					console.log('Loaded geometry:', geometry);
+				}
+			} catch (error) {
+				console.warn('Failed to fetch geometry:', error);
+			}
+
+			// Fetch meta (always needed for some info)
+			try {
+				const metaResponse = await fetch(`/tracks/load/${trackId}`);
+				if (metaResponse.ok) {
+					meta = await metaResponse.json();
+				} else {
+					throw new Error('Track not found');
+				}
+			} catch (error) {
+				console.error('Failed to load track meta:', error);
+				this.hideLoadingOverlay();
+				this.showToast('Failed to load track metadata', 'error');
 				return;
 			}
-			await this.initEditorWith(meta);
+
+			// Resolve base image path
+			imageUrl = this.resolveBaseImagePath(trackId, geometry, meta);
+
+			// Load image
+			let image = null;
+			if (imageUrl) {
+				try {
+					image = await this.loadImage(imageUrl);
+				} catch (error) {
+					console.warn('Failed to load base image:', error);
+					this.showToast('Base image not found — create or upload one.', 'warning');
+				}
+			}
+
+			// Apply to editor
+			this.applyGeometryToEditor(geometry, image, meta);
+
+			// Hide loading overlay
+			this.hideLoadingOverlay();
+
+			// Show success message
+			if (geometry) {
+				this.showToast('Track loaded with geometry', 'success');
+			} else {
+				this.showToast('Track loaded (image only)', 'info');
+			}
+
 		} catch (error) {
 			console.error('Failed to load track:', error);
-			alert('Failed to load track. Try again later.');
+			this.hideLoadingOverlay();
+			this.showToast('Failed to load track — check server.', 'error');
 		}
 	}
 
 	async loadGeometryFromFile(file) {
 		try {
 			const text = await file.text();
-			const meta = JSON.parse(text);
-			await this.initEditorWith(meta);
+			const data = JSON.parse(text);
+
+			// Check if this is a geometry.json or meta.json
+			let geometry = null;
+			let meta = null;
+
+			if (data.trackId && data.walls) {
+				// This is a geometry.json
+				geometry = data;
+				// Try to create minimal meta
+				meta = {
+					id: data.trackId,
+					name: data.meta?.name || 'Loaded Track',
+					author: data.meta?.author || 'Unknown',
+					createdAt: data.createdAt,
+					geometry: 'geometry.json'
+				};
+			} else if (data.id && data.name) {
+				// This is a meta.json
+				meta = data;
+				// If it has geometry reference, we might need to load it, but for now assume not
+			} else {
+				throw new Error('Invalid JSON format');
+			}
+
+			// If geometry has image reference, try to load it
+			let image = null;
+			if (geometry && geometry.imagePath) {
+				try {
+					image = await this.loadImage(geometry.imagePath);
+				} catch (error) {
+					console.warn('Failed to load image from geometry:', error);
+				}
+			}
+
+			// Apply to editor
+			this.applyGeometryToEditor(geometry, image, meta);
+
 		} catch (error) {
 			console.error('Failed to load geometry from file:', error);
-			alert('Failed to load track file. Please ensure it\'s a valid JSON file.');
+			this.showToast('Failed to load track file. Please ensure it\'s a valid JSON file.', 'error');
 		}
 	}
 
-	async initEditorWith(meta) {
-		console.log('LevelEditor.initEditorWith called with meta:', meta);
-		if (!this.container) {
-			console.error('Editor container not found');
-			return;
+	resolveBaseImagePath(trackId, geometry, meta) {
+		const baseUrl = `/tracks/${trackId}`;
+
+		// Priority order for image path
+		let candidates = [];
+
+		// 1. If geometry contains imagePath or meta.canonical
+		if (geometry && geometry.meta && geometry.meta.canonical) {
+			candidates.push(`${baseUrl}/${geometry.meta.canonical}`);
 		}
-		if (!this.canvas || !this.ctx) {
-			console.error('Editor canvas not ready');
-			return;
+		if (geometry && geometry.imagePath) {
+			candidates.push(geometry.imagePath);
 		}
 
+		// 2. From meta
+		if (meta && meta.canonical) {
+			candidates.push(`${baseUrl}/${meta.canonical}`);
+		}
+
+		// 3. Fallbacks
+		candidates.push(`${baseUrl}/canonical.png`);
+		candidates.push(`${baseUrl}/original.png`);
+		candidates.push(`${baseUrl}/original.jpg`);
+		candidates.push(`${baseUrl}/original.jpeg`);
+		candidates.push(`${baseUrl}/original.svg`);
+
+		// Return first candidate (they will be tried in order)
+		return candidates[0] || null;
+	}
+
+	async applyGeometryToEditor(geometry, image, meta) {
+		// Set current meta
 		this.currentMeta = meta;
+		this.trackImage = image;
+
+		// Update track label
 		const baseName = meta?.name || 'Unknown Track';
 		this.updateTrackLabel(baseName);
 
-		await this.loadBaseImage(meta);
+		// Initialize editor state
+		if (geometry) {
+			// Load from geometry
+			this.editorState.trackId = geometry.trackId || meta.id;
+			this.editorState.createdAt = geometry.createdAt || new Date().toISOString();
+			this.editorState.updatedAt = geometry.updatedAt || new Date().toISOString();
+			this.editorState.startLine = geometry.startLine || null;
+			this.editorState.spawn = geometry.spawn || null;
+			this.editorState.checkpoints = geometry.checkpoints || [];
+			this.editorState.walls = geometry.walls ? geometry.walls.map(wall => ({
+				id: wall.id,
+				polyline: wall.polyline.map(point => ({ x: point[0], y: point[1] }))
+			})) : [];
+			this.editorState.meta = geometry.meta || {};
+			this.editorState.dirty = false;
+		} else {
+			// Empty geometry
+			this.editorState.trackId = meta.id;
+			this.editorState.createdAt = new Date().toISOString();
+			this.editorState.updatedAt = new Date().toISOString();
+			this.editorState.startLine = null;
+			this.editorState.spawn = null;
+			this.editorState.checkpoints = [];
+			this.editorState.walls = [];
+			this.editorState.meta = {};
+			this.editorState.dirty = false;
+		}
+
+		// Reset undo/redo stacks
+		this.undoStack = [];
+		this.redoStack = [];
+
+		// Initialize view and show editor
 		this.initializeView();
 		this.render();
 		this.showEditor();
 
-		// Check for drafts after loading
+		// Check for drafts
 		this.checkForDraft();
 	}
 
-	async loadBaseImage(meta) {
-		const baseUrl = '/tracks';
-		const trackFolder = meta.id ? `${baseUrl}/${meta.id}` : baseUrl;
-		let imageUrl = null;
 
-		if (meta.geometry && meta.geometry.image) {
-			imageUrl = meta.geometry.image;
-		} else {
-			try {
-				const response = await fetch(`${trackFolder}/canonical.png`);
-				if (response.ok) {
-					imageUrl = `${trackFolder}/canonical.png`;
-				}
-			} catch (error) {
-				// Continue searching
-			}
-
-			if (!imageUrl) {
-				const extensions = ['png', 'jpg', 'jpeg', 'svg', 'webp'];
-				for (const ext of extensions) {
-					try {
-						const response = await fetch(`${trackFolder}/original.${ext}`);
-						if (response.ok) {
-							imageUrl = `${trackFolder}/original.${ext}`;
-							break;
-						}
-					} catch (error) {
-						// Continue searching
-					}
-				}
-			}
-		}
-
-		if (imageUrl) {
-			try {
-				this.trackImage = await this.loadImage(imageUrl);
-			} catch (error) {
-				console.warn('Failed to load base image:', error);
-				this.trackImage = null;
-			}
-		} else {
-			console.warn('No base image found for track');
-			this.trackImage = null;
-		}
-	}
 
 	initializeView() {
 		if (this.trackImage && this.canvas) {
@@ -457,11 +559,11 @@ class LevelEditor {
 		}
 	}
 
-	showWallExtractionOverlay() {
-		let overlay = document.getElementById('wall-extraction-overlay');
+	showLoadingOverlay() {
+		let overlay = document.getElementById('loading-overlay');
 		if (!overlay) {
 			overlay = document.createElement('div');
-			overlay.id = 'wall-extraction-overlay';
+			overlay.id = 'loading-overlay';
 			overlay.style.cssText = `
 				position: fixed;
 				top: 0;
@@ -476,10 +578,17 @@ class LevelEditor {
 				color: white;
 				font-size: 24px;
 			`;
-			overlay.innerHTML = '<div>Adding Walls...</div>';
+			overlay.innerHTML = '<div>Loading track…</div>';
 			document.body.appendChild(overlay);
 		}
 		overlay.style.display = 'flex';
+	}
+
+	hideLoadingOverlay() {
+		const overlay = document.getElementById('loading-overlay');
+		if (overlay) {
+			overlay.style.display = 'none';
+		}
 	}
 
 	hideWallExtractionOverlay() {
@@ -767,7 +876,13 @@ const levelEditor = new LevelEditor();
 levelEditor.initialize();
 
 export function initEditorWith(meta) {
-	levelEditor.initEditorWith(meta);
+	// For backward compatibility, if meta has id, treat as track load
+	if (meta && meta.id) {
+		levelEditor.loadTrackById(meta.id);
+	} else {
+		// Fallback to old behavior
+		levelEditor.applyGeometryToEditor(null, null, meta);
+	}
 }
 
 export function loadGeometryFromFile(file) {
