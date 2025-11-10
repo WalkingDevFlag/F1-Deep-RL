@@ -65,6 +65,10 @@ class LevelEditor {
 	}
 
 	initialize() {
+		if (!this.container || !this.canvas) {
+			// Not on the editor page, skip initialization
+			return;
+		}
 		this.createHUD();
 		this.setupEventListeners();
 		this.loadFromURL();

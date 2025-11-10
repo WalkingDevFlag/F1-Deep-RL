@@ -363,7 +363,7 @@ export function applyInteractionMixin(LevelEditor) {
             if (panBtn) {
                 panBtn.classList.add('is-active');
             }
-            this.canvas.style.cursor = 'grab';
+            if (this.canvas) this.canvas.style.cursor = 'grab';
             if (this.currentTool && this.currentTool !== 'pan') {
                 this.deactivateTool(this.currentTool);
             }
@@ -371,7 +371,7 @@ export function applyInteractionMixin(LevelEditor) {
             if (panBtn) {
                 panBtn.classList.remove('is-active');
             }
-            this.canvas.style.cursor = 'default';
+            if (this.canvas) this.canvas.style.cursor = 'default';
         }
         this.render();
     };
