@@ -11,6 +11,7 @@ class Track {
         this.borders = [];
         this.checkpoints = [];
         this.walls = [];
+        this.startLine = null;
         this.geometryLoaded = false;
     }
 
@@ -256,6 +257,11 @@ class Track {
         // Set checkpoints
         this.checkpoints = geometry.checkpoints;
 
+        // Set start/finish line
+        if (geometry.startLine) {
+            this.startLine = geometry.startLine;
+        }
+
         // Set spawn point
         this.spawnPoint = {
             x: geometry.spawn.x,
@@ -263,7 +269,7 @@ class Track {
             angle: geometry.spawn.angle || 0
         };
 
-        console.log(`Applied geometry: ${this.borders.length} border segments, ${this.checkpoints.length} checkpoints`);
+        console.log(`Applied geometry: ${this.borders.length} border segments, ${this.checkpoints.length} checkpoints, startLine: ${this.startLine ? 'yes' : 'no'}`);
     }
 
     getSpawnPoint() {
@@ -280,6 +286,10 @@ class Track {
 
     getCheckpoints() {
         return this.checkpoints;
+    }
+
+    getStartLine() {
+        return this.startLine;
     }
 
     isGeometryLoaded() {

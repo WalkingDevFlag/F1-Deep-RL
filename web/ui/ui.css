@@ -43,6 +43,13 @@ canvas#canvas {
     z-index: 10;
 }
 
+.ui-card--top-right {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 10;
+}
+
 .editor-header {
     position: absolute;
     top: 20px;

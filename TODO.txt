@@ -46,6 +46,18 @@ Level Editor Upgrades/Fixes:
 5) On the Dock, when i click on the button it turns to text and all fix that shit
 6) Allow me to Rename the Track by clicking on the top left text editing it over there
 7) Erase Wall Borders
+8) Standardise Track Layout Sizes
+9) Fix Checkpoints functions, like copy pasting checkpoints
+10) All Keyboard Shortcuts to be standardised
+11) Renderes a checkered Flag on the start and Finish
+
+
+Main Simulation Upgrades/Fixes:
+1) Adding Lap timer 
+2) Adding Lap Count
+3) Adding Reset Count (For AI)
+4) Adding a Auto Drive on Full Speed for Car, no AI. Calculates mid of the whole track and drives on that mid line 
+5) 
 
 Bugs:
 web/levelEditor.js: setWallExtractionState calls this.showWallExtractionOverlay() (around the wall extraction toggle), but no such method exists anywhere in the editor mixins—invoking wall extraction currently explodes with a TypeError before any work is done.

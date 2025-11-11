@@ -626,6 +626,15 @@ class Game {
         this.deltaTime = 0;
         this.neuralNetworkVisible = true;
         this.uiElements = {};
+        
+        // Lap timing
+        this.lapCount = 0;
+        this.lapStartTime = null; // Start as null, will be set when car moves
+        this.currentLapTime = 0;
+        this.carHasStartedMoving = false;
+        this.collisionTime = null; // Store time when collision occurred
+        this.lastCarPosition = { x: 0, y: 0 }; // Store last position for line crossing detection
+        this.hasPassedStartLine = false; // Track if car has passed start line
     }
 
     async init() {
@@ -693,6 +702,12 @@ class Game {
         if (this.uiElements) {
             if (this.uiElements.hudCard && this.uiElements.hudCard.element instanceof HTMLElement) {
                 const { element } = this.uiElements.hudCard;
+                if (element.parentElement) {
+                    element.parentElement.removeChild(element);
+                }
+            }
+            if (this.uiElements.lapCard && this.uiElements.lapCard.element instanceof HTMLElement) {
+                const { element } = this.uiElements.lapCard;
                 if (element.parentElement) {
                     element.parentElement.removeChild(element);
                 }
@@ -802,6 +817,19 @@ class Game {
             document.body.appendChild(hudCard.element);
         }
 
+        // Create Lap Timer Card
+        const trackName = this.trackMeta ? this.trackMeta.name : 'Unknown Track';
+        const lapCard = createCard({ title: `${trackName}`, classNames: ['ui-card--top-right'] });
+        lapCard.element.setAttribute('aria-label', 'Lap timing information');
+
+        const lapTimeRow = createStatRow({ label: 'Lap Time', value: '00:00:000' });
+        const lapCountRow = createStatRow({ label: 'Laps', value: '0' });
+
+        lapCard.addMany([lapTimeRow, lapCountRow]);
+        if (document.body) {
+            document.body.appendChild(lapCard.element);
+        }
+
         let dockElementRef = null;
         let homeButtonRef = null;
         let levelEditorButtonRef = null;
@@ -865,6 +893,9 @@ class Game {
             nnRow,
             wallsRow,
             checkpointsRow,
+            lapCard,
+            lapTimeRow,
+            lapCountRow,
             dock: {
                 element: dockElementRef,
                 homeButton: homeButtonRef,
@@ -927,6 +958,35 @@ class Game {
                 this.uiElements.checkpointsRow.setChecked(rendererCheckpointsState, { silent: true });
             }
         }
+
+        // Update lap timer
+        if (this.uiElements.lapTimeRow && typeof this.uiElements.lapTimeRow.setValue === 'function') {
+            if (this.lapStartTime !== null) {
+                const lapTimeMs = performance.now() - this.lapStartTime;
+                const formattedTime = this.formatLapTime(lapTimeMs);
+                this.uiElements.lapTimeRow.setValue(formattedTime);
+            } else if (this.collisionTime !== null) {
+                // Show frozen time from collision
+                const formattedTime = this.formatLapTime(this.collisionTime);
+                this.uiElements.lapTimeRow.setValue(formattedTime);
+            } else {
+                this.uiElements.lapTimeRow.setValue('00:00:000');
+            }
+        }
+
+        // Update lap count
+        if (this.uiElements.lapCountRow && typeof this.uiElements.lapCountRow.setValue === 'function') {
+            this.uiElements.lapCountRow.setValue(this.lapCount.toString());
+        }
+    }
+
+    formatLapTime(ms) {
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        const milliseconds = Math.floor((ms % 1000));
+
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${milliseconds.toString().padStart(3, '0')}`;
     }
 
     resetCar() {
@@ -936,6 +996,69 @@ class Game {
             clearTimeout(this.collisionResetTimeout);
             this.collisionResetTimeout = null;
         }
+        
+        // Reset lap timer state on reset - timer will start again when car moves
+        this.lapStartTime = null;
+        this.carHasStartedMoving = false;
+        this.collisionTime = null; // Clear collision time
+        this.lastCarPosition = { x: this.car.x, y: this.car.y }; // Reset position tracking
+        console.log('Car reset - lap timer will start when car moves again');
+    }
+
+    checkLapCompletion() {
+        const startLine = this.track.getStartLine();
+        if (!startLine) return;
+
+        const carX = this.car.x;
+        const carY = this.car.y;
+        const lastX = this.lastCarPosition.x;
+        const lastY = this.lastCarPosition.y;
+
+        // Check if car crossed the start/finish line
+        const crossed = this.lineSegmentIntersect(
+            lastX, lastY, carX, carY,
+            startLine.x1, startLine.y1, startLine.x2, startLine.y2
+        );
+
+        if (crossed && this.carHasStartedMoving) {
+            // Only count lap if car is moving forward (positive speed)
+            // This prevents reverse laps from counting
+            if (this.car.speed > 0) {
+                this.completeLap();
+            } else {
+                console.log('Crossed finish line in reverse - lap not counted');
+            }
+        }
+
+        // Update last position
+        this.lastCarPosition.x = carX;
+        this.lastCarPosition.y = carY;
+    }
+
+    normalizeAngle(angle) {
+        // Normalize angle to [-π, π]
+        while (angle > Math.PI) angle -= 2 * Math.PI;
+        while (angle < -Math.PI) angle += 2 * Math.PI;
+        return angle;
+    }
+
+    lineSegmentIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+        // Check if line segment (x1,y1)-(x2,y2) intersects with (x3,y3)-(x4,y4)
+        const denom = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
+        if (denom === 0) return false;
+
+        const ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denom;
+        const ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denom;
+
+        return (ua >= 0 && ua <= 1 && ub >= 0 && ub <= 1);
+    }
+
+    completeLap() {
+        // Increment lap count and reset timer
+        this.lapCount++;
+        this.lapStartTime = performance.now();
+        this.carHasStartedMoving = true; // Ensure timer is running
+        console.log(`Lap ${this.lapCount} completed!`);
     }
 
     update() {
@@ -951,17 +1074,35 @@ class Game {
         const trackBorders = this.track.getBorders();
         this.car.update(keys, this.trackImg, this.offscreenCtx, trackBorders, this.deltaTime);
 
-        // Update camera
-        this.camera.update(this.car);
-
-        // Handle collision auto-reset
+        // Handle collision auto-reset FIRST
         if (this.car.damaged && !this.collisionResetTimeout) {
-            console.log('Collision detected! Press R to reset.');
+            console.log('Collision detected! Press R to reset. Auto-reset in 1.5s.');
+            // Stop the lap timer on collision and freeze the time
+            this.carHasStartedMoving = false;
+            if (this.lapStartTime !== null) {
+                this.collisionTime = performance.now() - this.lapStartTime;
+                this.lapStartTime = null; // Clear lapStartTime so timer stops counting
+            }
             this.collisionResetTimeout = setTimeout(() => {
                 if (this.car.damaged) {
                     this.resetCar();
                 }
             }, 1500); // Auto-reset after 1.5 seconds
+        }
+
+        // Start lap timer when car first moves (only if not damaged)
+        if (!this.carHasStartedMoving && !this.car.damaged && this.car && Math.abs(this.car.speed) > 0.1) {
+            this.carHasStartedMoving = true;
+            this.lapStartTime = performance.now();
+            console.log('Lap timer started - car is moving!');
+        }
+
+        // Update camera
+        this.camera.update(this.car);
+
+        // Check for lap completion (start/finish line crossing)
+        if (!this.car.damaged && this.track && this.track.getStartLine()) {
+            this.checkLapCompletion();
         }
 
         if (!this.car.damaged && this.collisionResetTimeout) {
