@@ -50,6 +50,66 @@ canvas#canvas {
     z-index: 10;
 }
 
+.training-card {
+    position: absolute;
+    top: 220px;
+    left: 20px;
+    z-index: 10;
+}
+
+.training-card__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.training-card__label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--hud-muted);
+}
+
+.training-card__select {
+    padding: 8px 10px;
+    border: 2px solid var(--hud-border);
+    border-radius: 6px;
+    background: var(--hud-surface);
+    color: var(--hud-text);
+    font-size: 14px;
+}
+
+.training-card__button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 2px solid var(--hud-border);
+    background: var(--hud-accent);
+    color: #ffffff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.training-card__button:hover,
+.training-card__button:focus-visible {
+    transform: translate(-2px, -2px);
+    box-shadow: none;
+    outline: none;
+}
+
+.training-card__button--busy {
+    cursor: wait;
+    opacity: 0.7;
+}
+
+.training-card__status {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--hud-muted);
+}
+
 .editor-header {
     position: absolute;
     top: 20px;

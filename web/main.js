@@ -635,6 +635,10 @@ class Game {
         this.collisionTime = null; // Store time when collision occurred
         this.lastCarPosition = { x: 0, y: 0 }; // Store last position for line crossing detection
         this.hasPassedStartLine = false; // Track if car has passed start line
+
+        this.trainingController = typeof window.TrainingController === 'function'
+            ? new window.TrainingController(this)
+            : null;
     }
 
     async init() {
@@ -663,6 +667,10 @@ class Game {
             const spawnPoint = await this.track.initialize();
             
             this.car.reset(spawnPoint);
+
+            if (this.trainingController) {
+                this.trainingController.onTrackReady();
+            }
 
             // Initialize camera
             this.camera = new Camera(this.canvas.width, this.canvas.height, this.trackImg.width, this.trackImg.height);
@@ -904,6 +912,10 @@ class Game {
             },
         };
 
+        if (this.trainingController) {
+            this.trainingController.attachUI();
+        }
+
         this.updateHUD();
     }
 
@@ -1003,6 +1015,10 @@ class Game {
         this.collisionTime = null; // Clear collision time
         this.lastCarPosition = { x: this.car.x, y: this.car.y }; // Reset position tracking
         console.log('Car reset - lap timer will start when car moves again');
+
+        if (this.trainingController) {
+            this.trainingController.onGameReset();
+        }
     }
 
     checkLapCompletion() {
@@ -1068,11 +1084,18 @@ class Game {
         this.lastFrameTime = currentTime;
         
         // Get keyboard input
-        const keys = this.controls.getKeys();
+        let keys = this.controls.getKeys();
+        if (this.trainingController && this.trainingController.isActive()) {
+            keys = this.trainingController.getControlKeys(keys);
+        }
 
         // Update car with physics and collision
         const trackBorders = this.track.getBorders();
         this.car.update(keys, this.trackImg, this.offscreenCtx, trackBorders, this.deltaTime);
+
+        if (this.trainingController) {
+            this.trainingController.handleFrame({ deltaTime: this.deltaTime });
+        }
 
         // Handle collision auto-reset FIRST
         if (this.car.damaged && !this.collisionResetTimeout) {
