@@ -168,29 +168,32 @@ class Car {
 
     update(keys, trackImg, offscreenCtx, trackBorders, deltaTime = 0.016) {
         if (!this.damaged) {
+            const frameScale = Math.max(deltaTime, 0) * 60;
+
             // Handle acceleration and deceleration
-            // Scale acceleration by delta time to make it frame-rate independent
             if (keys['KeyW'] || keys['ArrowUp']) {
-                this.speed = Math.min(this.maxSpeed, this.speed + this.acceleration * deltaTime * 60);
+                this.speed = Math.min(this.maxSpeed, this.speed + this.acceleration * frameScale);
             } else {
-                this.speed *= this.friction;
+                const frictionFactor = Math.pow(this.friction, frameScale);
+                this.speed *= Number.isFinite(frictionFactor) ? frictionFactor : this.friction;
             }
-            
+
             // Handle reverse (slower acceleration)
             if (keys['KeyS'] || keys['ArrowDown']) {
-                this.speed = Math.max(-this.maxSpeed / 2, this.speed - (this.acceleration / 2) * deltaTime * 60);
+                this.speed = Math.max(-this.maxSpeed / 2, this.speed - (this.acceleration / 2) * frameScale);
             }
-            
+
             // Apply turning (reduce speed slightly when turning)
             let turnSpeed = this.speed;
             if ((keys['KeyA'] || keys['ArrowLeft']) || (keys['KeyD'] || keys['ArrowRight'])) {
-                turnSpeed *= 0.9; // Slight speed reduction when turning
+                const turnDamping = Math.pow(0.9, frameScale);
+                turnSpeed *= Number.isFinite(turnDamping) ? turnDamping : 0.9;
             }
-            
-            // Calculate movement using delta time
-            // Speed is in pixels per second, so we multiply by deltaTime to get frame-independent movement
-            let moveX = Math.cos(this.angle) * turnSpeed;
-            let moveY = Math.sin(this.angle) * turnSpeed;
+
+            // Calculate movement using delta time (frameScale normalises to 60 FPS baseline)
+            const displacement = turnSpeed * frameScale;
+            const moveX = Math.cos(this.angle) * displacement;
+            const moveY = Math.sin(this.angle) * displacement;
             
             // Handle turning (rotate angle based on delta time)
             // 1.2 radians per second for slower, more controlled turning
