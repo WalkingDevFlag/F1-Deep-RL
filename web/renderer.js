@@ -161,3 +161,7 @@ class Renderer {
         // HUD is handled by the DOM overlay in index.html.
     }
 }
+
+if (typeof window !== 'undefined') {
+    window.Renderer = Renderer;
+}

@@ -28,3 +28,7 @@ class Controls {
         this.keys['KeyR'] = false;
     }
 }
+
+if (typeof window !== 'undefined') {
+    window.Controls = Controls;
+}

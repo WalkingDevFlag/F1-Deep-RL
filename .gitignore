@@ -131,4 +131,5 @@ self-driving-car/
 DDQN-Car-Racing/
 tb_logs/
 models/
-TODO
+TODO.txt
+checkpoints/

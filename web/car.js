@@ -276,3 +276,7 @@ class Car {
         console.log('Car reset to spawn point:', spawnPoint);
     }
 }
+
+if (typeof window !== 'undefined') {
+    window.Car = Car;
+}

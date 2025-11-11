@@ -50,14 +50,18 @@ Level Editor Upgrades/Fixes:
 9) Fix Checkpoints functions, like copy pasting checkpoints
 10) All Keyboard Shortcuts to be standardised
 11) Renderes a checkered Flag on the start and Finish
+12) Remove Test Drive Button
+13) Remove "Editing: Track Name" from Hud
 
 
 Main Simulation Upgrades/Fixes:
-1) Adding Lap timer 
-2) Adding Lap Count
-3) Adding Reset Count (For AI)
-4) Adding a Auto Drive on Full Speed for Car, no AI. Calculates mid of the whole track and drives on that mid line 
-5) 
+1) Adding a Auto Drive on Full Speed for Car, no AI. Calculates mid of the whole track and drives on that mid line 
+2) 
+
+Ai Training:
+1) Pause/Play button
+2) Button To let the Latest Trained AI Takeover and Drive
+3) Adding Reset Count (For AI) 
 
 Bugs:
 web/levelEditor.js: setWallExtractionState calls this.showWallExtractionOverlay() (around the wall extraction toggle), but no such method exists anywhere in the editor mixins—invoking wall extraction currently explodes with a TypeError before any work is done.

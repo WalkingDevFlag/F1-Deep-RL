@@ -296,3 +296,7 @@ class Track {
         return this.geometryLoaded;
     }
 }
+
+if (typeof window !== 'undefined') {
+    window.Track = Track;
+}

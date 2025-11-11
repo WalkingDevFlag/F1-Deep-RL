@@ -2,7 +2,7 @@
   "version": 1,
   "trackId": "albert_park_circuit_melbourne_track_transparent",
   "createdAt": "2025-11-09T18:13:04.525023Z",
-  "updatedAt": "2025-11-11T22:44:47.111630Z",
+  "updatedAt": "2025-11-10T11:56:17.411576Z",
   "spawn": {
     "x": 7792,
     "y": 8145,
@@ -223,15 +223,6 @@
       "width": 78,
       "height": 440,
       "angle": 0,
-      "radius": 0
-    },
-    {
-      "id": "CP25",
-      "x": 5825,
-      "y": 7885,
-      "width": 520,
-      "height": 37,
-      "angle": -0.5578926331936529,
       "radius": 0
     }
   ],
