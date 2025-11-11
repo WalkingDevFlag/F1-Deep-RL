@@ -25,6 +25,8 @@
                 distanceNorm: 1,
                 progressWithinLap: 0,
             };
+            this.prevSteeringAngle = null;
+            this.collisionSinceLastLap = false;
             this._agentsLoaded = false;
         }
 
@@ -186,6 +188,8 @@
                 this.prevLapCount = this.game.lapCount || 0;
                 this.prevProgressWithinLap = 0;
                 this.prevDamaged = this.game.car ? this.game.car.damaged : false;
+                this.prevSteeringAngle = this.game.car ? this.game.car.angle || 0 : 0;
+                this.collisionSinceLastLap = false;
                 this.checkpointState.totalCleared = 0;
                 this.checkpointState.nextIndex = 0;
                 this.checkpointState.distanceNorm = 1;
@@ -222,6 +226,8 @@
                 this.currentAction = 0;
                 this.previousStateVector = null;
                 this.resetFlag = false;
+                this.prevSteeringAngle = null;
+                this.collisionSinceLastLap = false;
                 this.updateStatus('Idle');
                 this.setUIBusy(false);
                 this.updateUIState();
@@ -280,6 +286,7 @@
                 reward += this.computeProgressDelta(checkpointMetrics.progressWithinLap);
                 reward += this.computeLapReward();
                 reward += this.computeSpeedReward(deltaTime);
+                reward += this.computeSmoothDrivingReward(deltaTime);
                 reward += this.computeCollisionPenalty();
             }
 
@@ -463,7 +470,12 @@
                 this.checkpointState.nextIndex = 0;
                 this.checkpointState.distanceNorm = 1;
                 this.checkpointState.progressWithinLap = 0;
-                return delta * 50;
+                let reward = delta * 50;
+                if (!this.collisionSinceLastLap) {
+                    reward += 20;
+                }
+                this.collisionSinceLastLap = false;
+                return reward;
             }
             return 0;
         }
@@ -471,6 +483,7 @@
         computeSpeedReward(deltaTime) {
             const car = this.game.car;
             if (!car) {
+                this.prevSteeringAngle = null;
                 return 0;
             }
             const dt = typeof deltaTime === 'number' && deltaTime > 0 ? deltaTime : 0.016;
@@ -482,8 +495,28 @@
             return speedReward + timePenalty;
         }
 
+        computeSmoothDrivingReward(deltaTime) {
+            const car = this.game.car;
+            const dt = typeof deltaTime === 'number' && deltaTime > 0 ? deltaTime : 0.016;
+            if (!car) {
+                this.prevSteeringAngle = null;
+                return 0;
+            }
+            const angle = car.angle || 0;
+            if (this.prevSteeringAngle === null) {
+                this.prevSteeringAngle = angle;
+                return 0;
+            }
+            const angularVelocity = Math.abs(angle - this.prevSteeringAngle) / dt;
+            this.prevSteeringAngle = angle;
+            const steadyTolerance = 0.6;
+            const smoothness = Math.max(0, steadyTolerance - angularVelocity);
+            return smoothness * 4 * dt;
+        }
+
         computeCollisionPenalty() {
             if (this.game.car && this.game.car.damaged && !this.prevDamaged) {
+                this.collisionSinceLastLap = true;
                 return -20;
             }
             return 0;
@@ -568,6 +601,8 @@
 
         onGameReset() {
             this.prevDamaged = false;
+            this.prevSteeringAngle = this.game.car ? this.game.car.angle || 0 : 0;
+            this.collisionSinceLastLap = false;
             if (this.enabled) {
                 this.resetFlag = true;
                 this.previousStateVector = null;

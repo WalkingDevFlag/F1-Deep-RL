@@ -2,8 +2,6 @@ Things to add:
 1) Generation Count
 2) Full Body Sensors
 3) Resume Training Logic
-4) Other Tracks
-5) Level / Track Editing Tool to edit tracks (Checkpoints, start and finish, walls, etc)
 6) Add unit tests
 
 Monitoring, logging, and checkpoints
@@ -30,14 +28,6 @@ Reward Policy:
 	4) Reverse / negative-speed penalty — penalize backwards motion if not needed.
 	5) Off-track timeout / stuck penalty — if car doesn’t move sufficiently for N steps, apply penalty and reset.
 
-Level Editor:
-1) Create a simple level editor to design and test new tracks quickly.
-2) Allow placing checkpoints, start/finish lines, walls, and other track features.
-3) Save and load track designs for training and evaluation.
-4) Allow to upload custom tracks via the web interface.
-
-
-
 Level Editor Upgrades/Fixes:
 1) Fixing the fact that if i upload a PNG then it correctly uploads PNG in the Editor but if i upload a SVG it shows no image available ig
 2) Fixing the Icons on the Dock
@@ -56,12 +46,16 @@ Level Editor Upgrades/Fixes:
 
 Main Simulation Upgrades/Fixes:
 1) Adding a Auto Drive on Full Speed for Car, no AI. Calculates mid of the whole track and drives on that mid line 
-2) 
+2) Fix the Issue/Bug when i change the camera perspective from God's Eye to Car Cam, it Plummets down from 165 to 11 fps......Need to Find and Fix the Bug
+3) 
 
 Ai Training:
 1) Pause/Play button
 2) Button To let the Latest Trained AI Takeover and Drive
 3) Adding Reset Count (For AI) 
+4) Stats Card For the AI Training, need to think on what stats i want to see 
+5) Add 2 new Actions, S + left and S + Right
+6) Resume Training Logic ig
 
 Bugs:
 web/levelEditor.js: setWallExtractionState calls this.showWallExtractionOverlay() (around the wall extraction toggle), but no such method exists anywhere in the editor mixins—invoking wall extraction currently explodes with a TypeError before any work is done.
