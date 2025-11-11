@@ -819,8 +819,17 @@ class Game {
                 }
             }
         });
+        const startFinishRow = createToggleRow({
+            label: 'Start/Finish',
+            initial: this.renderer ? this.renderer.showStartFinish : false,
+            onToggle: (enabled) => {
+                if (this.renderer) {
+                    this.renderer.setShowStartFinish(enabled);
+                }
+            }
+        });
 
-        hudCard.addMany([fpsRow, cameraRow, sensorsRow, nnRow, wallsRow, checkpointsRow]);
+        hudCard.addMany([fpsRow, cameraRow, sensorsRow, nnRow, wallsRow, checkpointsRow, startFinishRow]);
         if (document.body) {
             document.body.appendChild(hudCard.element);
         }
@@ -901,6 +910,7 @@ class Game {
             nnRow,
             wallsRow,
             checkpointsRow,
+            startFinishRow,
             lapCard,
             lapTimeRow,
             lapCountRow,
@@ -968,6 +978,16 @@ class Game {
             const rendererCheckpointsState = this.renderer.showCheckpoints;
             if (currentCheckpointsState !== rendererCheckpointsState) {
                 this.uiElements.checkpointsRow.setChecked(rendererCheckpointsState, { silent: true });
+            }
+        }
+
+        if (this.uiElements.startFinishRow && typeof this.uiElements.startFinishRow.setChecked === 'function' && this.renderer) {
+            const currentStartFinishState = typeof this.uiElements.startFinishRow.getChecked === 'function'
+                ? this.uiElements.startFinishRow.getChecked()
+                : null;
+            const rendererStartFinishState = this.renderer.showStartFinish;
+            if (currentStartFinishState !== rendererStartFinishState) {
+                this.uiElements.startFinishRow.setChecked(rendererStartFinishState, { silent: true });
             }
         }
 

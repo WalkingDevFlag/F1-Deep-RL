@@ -12,6 +12,8 @@ class Renderer {
         this.showWalls = false;
         // Checkpoint rendering toggle (default OFF for performance)
         this.showCheckpoints = false;
+        // Start/Finish line rendering toggle (default OFF for performance)
+        this.showStartFinish = false;
     }
 
     drawFrame(trackImg, car, carImg, camera, track = null) {
@@ -42,6 +44,11 @@ class Renderer {
         // Draw checkpoints if enabled
         if (this.showCheckpoints && track) {
             this.drawCheckpoints(track);
+        }
+        
+        // Draw start/finish line if enabled
+        if (this.showStartFinish && track) {
+            this.drawStartFinish(track);
         }
         
         // Draw car (which includes sensors)
@@ -112,12 +119,42 @@ class Renderer {
         this.ctx.restore();
     }
 
+    drawStartFinish(track) {
+        const startLine = track.getStartLine();
+        if (!startLine) return;
+
+        this.ctx.save();
+        this.ctx.strokeStyle = 'rgba(255, 165, 0, 0.8)'; // Semi-transparent orange
+        this.ctx.lineWidth = 3;
+        this.ctx.lineCap = 'round';
+
+        // Draw the start/finish line
+        this.ctx.beginPath();
+        this.ctx.moveTo(startLine.x1, startLine.y1);
+        this.ctx.lineTo(startLine.x2, startLine.y2);
+        this.ctx.stroke();
+
+        // Draw a small label
+        const midX = (startLine.x1 + startLine.x2) / 2;
+        const midY = (startLine.y1 + startLine.y2) / 2;
+        this.ctx.fillStyle = 'rgba(255, 165, 0, 0.9)';
+        this.ctx.font = '12px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('S/F', midX, midY - 8);
+
+        this.ctx.restore();
+    }
+
     setShowWalls(show) {
         this.showWalls = Boolean(show);
     }
 
     setShowCheckpoints(show) {
         this.showCheckpoints = Boolean(show);
+    }
+
+    setShowStartFinish(show) {
+        this.showStartFinish = Boolean(show);
     }
 
     drawHUD(car, camera) {
