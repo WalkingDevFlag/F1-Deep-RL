@@ -10,15 +10,10 @@ Monitoring, logging, and checkpoints
 
 
 Reward Policy:
-1) Checkpoint Functionality in Tracks
-2) Start and Finish in Tracks
-3) Laps System
-4) Timing Per Lap
-5) New reward policies & penalties:
+New reward policies & penalties:
 - Positive rewards (encourage behaviour):
 	1) Forward speed reward — keep your existing +k * speed (encourages forward motion).
 	2) Clearance reward — reward proportional to mean sensor distance (staying away from walls).
-	?) Centeredness reward — reward when left/right sensor means are similar (stay in the middle of the lane).
 	3) Heading stability reward — small reward for small change in heading between steps (discourages violent oscillation).
 	4) Progress / checkpoint reward — sparse + small dense reward for getting closer to the next checkpoint or passing one (the true 	   task objective).
 - Penalties (discourage bad behaviour):
@@ -42,10 +37,12 @@ Level Editor Upgrades/Fixes:
 11) Renderes a checkered Flag on the start and Finish
 12) Remove Test Drive Button
 13) Remove "Editing: Track Name" from Hud
+14) Change Overlay text to use Shiny Text As loading
+15) Make Overlay Darker
 
 
 Main Simulation Upgrades/Fixes:
-1) Adding a Auto Drive on Full Speed for Car, no AI. Calculates mid of the whole track and drives on that mid line 
+1) Adding a Auto Drive on Full Speed for Car, no AI. Calculates mid of the whole track and drives on that mid line, will press on W key and W + A and W + D
 2) Fix the Issue/Bug when i change the camera perspective from God's Eye to Car Cam, it Plummets down from 165 to 11 fps......Need to Find and Fix the Bug
 3) 
 
@@ -54,8 +51,8 @@ Ai Training:
 2) Button To let the Latest Trained AI Takeover and Drive
 3) Adding Reset Count (For AI) 
 4) Stats Card For the AI Training, need to think on what stats i want to see 
-5) Add 2 new Actions, S + left and S + Right
-6) Resume Training Logic ig
+5) Resume Training Logic ig
+6) Reward Calculator
 
 Bugs:
 web/levelEditor.js: setWallExtractionState calls this.showWallExtractionOverlay() (around the wall extraction toggle), but no such method exists anywhere in the editor mixins—invoking wall extraction currently explodes with a TypeError before any work is done.

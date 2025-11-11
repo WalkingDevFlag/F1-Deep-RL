@@ -11,7 +11,7 @@
             this.previousStateVector = null;
             this.resetFlag = false;
             this.stateSize = 19;
-            this.actionSize = 5;
+            this.actionSize = 7;
             this.prevLapCount = 0;
             this.prevProgressWithinLap = 0;
             this.prevDamaged = false;
@@ -258,6 +258,8 @@
                 2: ['KeyW', 'ArrowUp', 'KeyA', 'ArrowLeft'],
                 3: ['KeyW', 'ArrowUp', 'KeyD', 'ArrowRight'],
                 4: ['KeyS', 'ArrowDown'],
+                5: ['KeyS', 'ArrowDown', 'KeyA', 'ArrowLeft'],
+                6: ['KeyS', 'ArrowDown', 'KeyD', 'ArrowRight'],
             };
             const codes = mapping[this.currentAction] || [];
             codes.forEach((code) => {

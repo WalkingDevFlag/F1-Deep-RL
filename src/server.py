@@ -124,7 +124,7 @@ class TrainerService:
 
 TRAINING_CONFIG = TrainingConfig(
     state_size=19,
-    action_size=5,
+    action_size=7,
     replay_buffer_size=100_000,
     batch_size=64,
     gamma=0.99,
