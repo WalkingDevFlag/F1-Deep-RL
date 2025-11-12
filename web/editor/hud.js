@@ -44,6 +44,13 @@ export function applyHudMixin(LevelEditor) {
     trackNameRow.style.fontSize = '15px';
     trackNameRow.id = 'editor-track-name';
     trackNameRow.textContent = 'Unknown Track';
+    trackNameRow.style.cursor = 'pointer';
+    trackNameRow.title = 'Click to rename track';
+
+    // Make track name editable
+    trackNameRow.addEventListener('click', () => {
+        this.makeTrackNameEditable(trackNameRow);
+    });
 
     const checkpointsToggle = createToggleRow({
         label: 'Checkpoints',
@@ -88,5 +95,63 @@ export function applyHudMixin(LevelEditor) {
         const headerSuffix = this.editorState.startLine ? ' (start ready)' : '';
         this.headerTitleEl.textContent = `${baseName}${headerSuffix}`;
     }
+    };
+
+    LevelEditor.prototype.makeTrackNameEditable = function makeTrackNameEditable(trackNameElement) {
+        if (!this.currentMeta) {
+            this.showToast('No track loaded', 'warning');
+            return;
+        }
+
+        const currentName = this.currentMeta.name || 'Unknown Track';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = currentName;
+        input.className = 'ui-row';
+        input.style.fontWeight = '600';
+        input.style.fontSize = '15px';
+        input.style.border = '2px solid var(--hud-accent)';
+        input.style.borderRadius = '4px';
+        input.style.padding = '2px 4px';
+        input.style.background = 'var(--hud-surface)';
+        input.style.color = 'var(--hud-text)';
+        input.style.width = '100%';
+        input.style.boxSizing = 'border-box';
+
+        // Replace the text with input
+        const parent = trackNameElement.parentNode;
+        parent.replaceChild(input, trackNameElement);
+
+        input.focus();
+        input.select();
+
+        const finishEditing = () => {
+            const newName = input.value.trim();
+            if (newName && newName !== currentName) {
+                // Update the track name
+                this.currentMeta.name = newName;
+                this.updateTrackLabel(newName);
+                this.markUnsavedChanges();
+                this.showToast('Track renamed', 'success');
+            } else {
+                // Restore original name if empty or unchanged
+                this.updateTrackLabel(currentName);
+            }
+            // Replace input back with text element
+            parent.replaceChild(trackNameElement, input);
+        };
+
+        input.addEventListener('blur', finishEditing);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                finishEditing();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                // Cancel editing - restore original
+                this.updateTrackLabel(currentName);
+                parent.replaceChild(trackNameElement, input);
+            }
+        });
     };
 }
