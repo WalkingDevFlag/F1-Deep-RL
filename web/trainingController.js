@@ -35,7 +35,8 @@
             this.totalReward = 0;
             this.isPaused = false;
             this.pauseStartTime = null;
-            this.savedLapTime = null;
+            this.pausedElapsedTrainingTime = 0;
+            this.pausedElapsedLapTime = 0;
         }
 
         async attachUI() {
@@ -163,21 +164,21 @@
             if (!this.enabled) return;
             this.isPaused = !this.isPaused;
             if (this.isPaused) {
-                // Pausing: record times
-                this.pauseStartTime = performance.now();
+                // Pausing: freeze elapsed times
+                if (this.trainingStartTime) {
+                    this.pausedElapsedTrainingTime = performance.now() - this.trainingStartTime;
+                }
                 if (this.game && this.game.lapStartTime !== null) {
-                    this.savedLapTime = performance.now() - this.game.lapStartTime;
+                    this.pausedElapsedLapTime = performance.now() - this.game.lapStartTime;
                 }
             } else {
-                // Resuming: adjust times to skip pause duration
-                if (this.pauseStartTime && this.trainingStartTime) {
-                    this.trainingStartTime += performance.now() - this.pauseStartTime;
+                // Resuming: adjust start times so they produce the frozen elapsed values
+                if (this.trainingStartTime) {
+                    this.trainingStartTime = performance.now() - this.pausedElapsedTrainingTime;
                 }
-                if (this.savedLapTime !== null && this.game) {
-                    this.game.lapStartTime = performance.now() - this.savedLapTime;
+                if (this.game) {
+                    this.game.lapStartTime = performance.now() - this.pausedElapsedLapTime;
                 }
-                this.pauseStartTime = null;
-                this.savedLapTime = null;
             }
             this.updateStatus(this.isPaused ? 'Paused' : 'Running');
             this.updateUIState();
@@ -287,8 +288,8 @@
                 this.currentReward = 0;
                 this.totalReward = 0;
                 this.isPaused = false;
-                this.pauseStartTime = null;
-                this.savedLapTime = null;
+                this.pausedElapsedTrainingTime = 0;
+                this.pausedElapsedLapTime = 0;
                 this.updateStatus('Running');
             } catch (error) {
                 console.error('Failed to start training', error);
@@ -329,8 +330,8 @@
                 this.currentReward = 0;
                 this.totalReward = 0;
                 this.isPaused = false;
-                this.pauseStartTime = null;
-                this.savedLapTime = null;
+                this.pausedElapsedTrainingTime = 0;
+                this.pausedElapsedLapTime = 0;
                 this.updateStatus('Idle');
                 this.setUIBusy(false);
                 this.updateUIState();
