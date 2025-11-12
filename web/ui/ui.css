@@ -353,6 +353,7 @@ canvas#canvas {
 }
 
 .ui-dock__button svg,
+.ui-dock__button img,
 .ui-dock__icon {
     width: 28px;
     height: 28px;
