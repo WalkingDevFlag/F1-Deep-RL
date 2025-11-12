@@ -1,7 +1,8 @@
+import hashlib
+import json
 import logging
 import os
 import random
-import time
 from dataclasses import dataclass
 from typing import Any, Deque, Dict, List, Optional, Tuple
 
@@ -10,6 +11,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from collections import deque
+from datetime import datetime
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +38,12 @@ class TrainingConfig:
     device: str = "cpu"
     checkpoint_dir: Optional[str] = None
     seed: Optional[int] = None
+    resume_mode: str = "auto"  # one of {auto, fresh, resume}
+    run_id: Optional[str] = None
+    policy_version: str = "default"
+    policy_signature: Optional[str] = None
+    run_subdir: str = "runs"
+    manifest_filename: str = "manifest.json"
 
     def __post_init__(self) -> None:
         if self.checkpoint_dir is None:
@@ -47,6 +56,21 @@ class TrainingConfig:
             raise ValueError("batch_size must be > 0")
         if self.state_size <= 0 or self.action_size <= 0:
             raise ValueError("state_size and action_size must be > 0")
+
+        valid_modes = {"auto", "fresh", "resume"}
+        if self.resume_mode not in valid_modes:
+            raise ValueError(f"resume_mode must be one of {sorted(valid_modes)}")
+
+        if self.run_id is not None:
+            self.run_id = self.run_id.strip()
+            if not self.run_id:
+                raise ValueError("run_id cannot be empty when provided")
+
+        self.policy_version = self.policy_version.strip() or "default"
+        if os.path.sep in self.run_subdir:
+            raise ValueError("run_subdir should be a single directory name")
+        if not self.manifest_filename.endswith(".json"):
+            raise ValueError("manifest_filename must be a JSON file name")
 
 
 class ReplayBuffer:
@@ -72,6 +96,175 @@ class ReplayBuffer:
         dones_arr = np.array(dones, dtype=np.float32)
         return states_arr, actions_arr, rewards_arr, next_states_arr, dones_arr
 
+
+class RunStateError(RuntimeError):
+    """Raised when run state or manifest handling fails."""
+
+
+class RunManager:
+    """Handles run directory resolution and manifest persistence."""
+
+    HISTORY_LIMIT = 25
+
+    def __init__(
+        self,
+        base_dir: str,
+        resume_mode: str,
+        run_id: Optional[str],
+        manifest_filename: str,
+        policy_version: str,
+        config_fingerprint: str,
+        policy_signature: Optional[str] = None,
+    ) -> None:
+        self._base_dir = Path(base_dir)
+        self._resume_mode = resume_mode
+        self._requested_run_id = run_id
+        self._manifest_name = manifest_filename
+        self._policy_version = policy_version
+        self._policy_signature = policy_signature
+        self._config_fingerprint = config_fingerprint
+
+        self.run_id: Optional[str] = None
+        self.run_dir: Optional[Path] = None
+        self.manifest_path: Optional[Path] = None
+        self.manifest: Dict[str, Any] = {}
+        self.resumed: bool = False
+
+        self._initialise()
+
+    # Public API ---------------------------------------------------------
+    def record_checkpoint(self, step: int, training_steps: int, checkpoint_path: Path) -> None:
+        if not self.manifest_path:
+            raise RunStateError("Manifest path is not initialised")
+
+        checkpoint_entry = {
+            "step": int(step),
+            "training_steps": int(training_steps),
+            "path": str(checkpoint_path),
+            "created_at": self._utc_now(),
+        }
+
+        history: List[Dict[str, Any]] = self.manifest.setdefault("checkpoints", [])
+        history.append(checkpoint_entry)
+        if len(history) > self.HISTORY_LIMIT:
+            del history[:-self.HISTORY_LIMIT]
+
+        self.manifest.update(
+            {
+                "total_steps": int(step),
+                "training_steps": int(training_steps),
+                "last_checkpoint": checkpoint_entry,
+                "updated_at": self._utc_now(),
+            }
+        )
+        self._write_manifest()
+
+    def update_progress(self, step: int, training_steps: int) -> None:
+        if not self.manifest_path:
+            raise RunStateError("Manifest path is not initialised")
+        self.manifest.update(
+            {
+                "total_steps": int(step),
+                "training_steps": int(training_steps),
+                "updated_at": self._utc_now(),
+            }
+        )
+        self._write_manifest()
+
+    # Internal helpers ---------------------------------------------------
+    def _initialise(self) -> None:
+        self._base_dir.mkdir(parents=True, exist_ok=True)
+
+        if self._resume_mode == "fresh":
+            self._start_new_run()
+            return
+
+        if self._resume_mode == "resume":
+            if not self._requested_run_id:
+                raise RunStateError("resume_mode 'resume' requires a run_id")
+            self._load_existing_run(self._requested_run_id)
+            return
+
+        # auto mode
+        if self._requested_run_id:
+            try:
+                self._load_existing_run(self._requested_run_id)
+                return
+            except (FileNotFoundError, RunStateError):
+                pass
+        self._start_new_run()
+
+    def _start_new_run(self) -> None:
+        base_run_id = self._requested_run_id or f"run_{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
+        run_id = base_run_id
+        counter = 1
+        run_dir = self._base_dir / run_id
+        while run_dir.exists():
+            run_id = f"{base_run_id}-{counter:02d}"
+            run_dir = self._base_dir / run_id
+            counter += 1
+
+        run_dir.mkdir(parents=True, exist_ok=False)
+        manifest_path = run_dir / self._manifest_name
+
+        self.run_id = run_id
+        self.run_dir = run_dir
+        self.manifest_path = manifest_path
+        self.resumed = False
+
+        self.manifest = {
+            "run_id": run_id,
+            "created_at": self._utc_now(),
+            "policy_version": self._policy_version,
+            "policy_signature": self._policy_signature,
+            "config_fingerprint": self._config_fingerprint,
+            "total_steps": 0,
+            "training_steps": 0,
+            "checkpoints": [],
+            "updated_at": self._utc_now(),
+        }
+        self._write_manifest()
+
+    def _load_existing_run(self, run_id: str) -> None:
+        run_dir = self._base_dir / run_id
+        manifest_path = run_dir / self._manifest_name
+        if not run_dir.exists():
+            raise FileNotFoundError(f"Run directory '{run_id}' does not exist")
+        if not manifest_path.exists():
+            raise RunStateError(f"Manifest missing for run '{run_id}'")
+
+        with manifest_path.open("r", encoding="utf-8") as handle:
+            manifest = json.load(handle)
+
+        stored_fingerprint = manifest.get("config_fingerprint")
+        stored_policy_version = manifest.get("policy_version")
+        stored_signature = manifest.get("policy_signature")
+
+        if stored_fingerprint != self._config_fingerprint or stored_policy_version != self._policy_version:
+            raise RunStateError(
+                "Training configuration or policy version changed; start a fresh run instead of resuming."
+            )
+
+        if self._policy_signature and stored_signature != self._policy_signature:
+            raise RunStateError("Policy signature mismatch; start a fresh run.")
+
+        self.run_id = run_id
+        self.run_dir = run_dir
+        self.manifest_path = manifest_path
+        self.manifest = manifest
+        self.resumed = True
+
+    def _write_manifest(self) -> None:
+        if not self.manifest_path:
+            raise RunStateError("Manifest path is not initialised")
+        tmp_path = self.manifest_path.with_suffix(".tmp")
+        with tmp_path.open("w", encoding="utf-8") as handle:
+            json.dump(self.manifest, handle, indent=2, sort_keys=True)
+        os.replace(tmp_path, self.manifest_path)
+
+    @staticmethod
+    def _utc_now() -> str:
+        return datetime.utcnow().isoformat(timespec="seconds") + "Z"
 
 class DQNNetwork(nn.Module):
     """Simple feed-forward network for value approximation."""
@@ -115,14 +308,20 @@ class DQNTrainer:
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=config.learning_rate)
         self.replay_buffer = ReplayBuffer(config.replay_buffer_size)
 
-        self.total_steps: int = 0
-        self.training_steps: int = 0
-        self.last_save_step: int = 0
-        self.running: bool = False
-        self.epsilon: float = config.start_epsilon
-        self.last_episode_return: float = 0.0
-        self.current_episode_return: float = 0.0
-        self.current_episode_length: int = 0
+        self.total_steps = 0
+        self.training_steps = 0
+        self.last_save_step = 0
+        self.running = False
+        self.epsilon = self.config.start_epsilon
+        self.last_episode_return = 0.0
+        self.current_episode_return = 0.0
+        self.current_episode_length = 0
+
+        self._config_fingerprint = self._compute_config_fingerprint()
+        self._run_manager = None
+        self._run_id = None
+        self._run_dir = None
+        self._initialise_run_state()
 
     def start(self) -> None:
         if not self.running:
@@ -189,6 +388,72 @@ class DQNTrainer:
 
         return metrics
 
+    # ------------------------------------------------------------------
+    def _initialise_run_state(self) -> None:
+        run_root = Path(self.config.checkpoint_dir) / self.config.run_subdir
+        manager = RunManager(
+            base_dir=str(run_root),
+            resume_mode=self.config.resume_mode,
+            run_id=self.config.run_id,
+            manifest_filename=self.config.manifest_filename,
+            policy_version=self.config.policy_version,
+            config_fingerprint=self._config_fingerprint,
+            policy_signature=self.config.policy_signature,
+        )
+
+        self._run_manager = manager
+        self._run_id = manager.run_id
+        self._run_dir = manager.run_dir
+
+        if not self._run_dir:
+            raise RunStateError("Run directory was not initialised")
+
+        self.active_run_dir = str(self._run_dir)
+
+        if manager.resumed:
+            last_checkpoint_info = manager.manifest.get("last_checkpoint") or {}
+            checkpoint_path = last_checkpoint_info.get("path")
+            if checkpoint_path:
+                if not os.path.exists(checkpoint_path):
+                    raise RunStateError(
+                        "Last checkpoint referenced in manifest is missing; start a fresh run instead."
+                    )
+                self.load_checkpoint(checkpoint_path)
+            else:
+                self.total_steps = int(manager.manifest.get("total_steps", 0))
+                self.training_steps = int(manager.manifest.get("training_steps", 0))
+                self.last_save_step = self.total_steps
+        else:
+            self.total_steps = 0
+            self.training_steps = 0
+            self.last_save_step = 0
+            self.epsilon = self.config.start_epsilon
+
+    def _compute_config_fingerprint(self) -> str:
+        snapshot_keys = [
+            "state_size",
+            "action_size",
+            "replay_buffer_size",
+            "batch_size",
+            "gamma",
+            "learning_rate",
+            "train_frequency",
+            "target_update_frequency",
+            "start_epsilon",
+            "end_epsilon",
+            "epsilon_decay_steps",
+            "save_every_steps",
+            "max_training_steps",
+            "min_replay_size",
+            "policy_version",
+        ]
+        snapshot: Dict[str, Any] = {key: getattr(self.config, key) for key in snapshot_keys}
+        if self.config.policy_signature:
+            snapshot["policy_signature"] = self.config.policy_signature
+
+        serialised = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(serialised.encode("utf-8")).hexdigest()
+
     def _learn(self) -> Optional[float]:
         if len(self.replay_buffer) < self.config.batch_size:
             return None
@@ -234,9 +499,14 @@ class DQNTrainer:
         self._save_checkpoint()
 
     def _save_checkpoint(self) -> str:
-        timestamp = int(time.time())
-        filename = f"dqn_step_{self.total_steps}_ts_{timestamp}.pt"
-        path = os.path.join(self.config.checkpoint_dir, filename)
+        if not self._run_dir:
+            raise RunStateError("Cannot save checkpoint without an active run directory")
+
+        timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
+        step_fragment = f"{self.total_steps:09d}"
+        base_name = self._run_id or "run"
+        filename = f"{base_name}_step_{step_fragment}_ts_{timestamp}.pt"
+        path = self._run_dir / filename
 
         payload = {
             "policy_state_dict": self.policy_net.state_dict(),
@@ -245,12 +515,16 @@ class DQNTrainer:
             "total_steps": self.total_steps,
             "training_steps": self.training_steps,
             "epsilon": self.epsilon,
+            "run_id": self._run_id,
+            "config_fingerprint": self._config_fingerprint,
             "config": self.config.__dict__,
         }
-        torch.save(payload, path)
+        torch.save(payload, str(path))
         self.last_save_step = self.total_steps
+        if self._run_manager:
+            self._run_manager.record_checkpoint(self.total_steps, self.training_steps, path)
         logger.info("Saved DQN checkpoint to %s", path)
-        return path
+        return str(path)
 
     def _flush_checkpoints(self) -> None:
         if self.total_steps != self.last_save_step:
@@ -269,18 +543,40 @@ class DQNTrainer:
             "last_episode_return": self.last_episode_return,
             "current_episode_return": self.current_episode_return,
             "current_episode_length": self.current_episode_length,
+            "run_id": self._run_id,
+            "run_directory": str(self._run_dir) if self._run_dir else None,
         }
 
     def load_checkpoint(self, path: str) -> None:
         if not os.path.exists(path):
             raise FileNotFoundError(path)
         payload = torch.load(path, map_location=self.device)
+
+        checkpoint_fingerprint = payload.get("config_fingerprint")
+        if checkpoint_fingerprint and checkpoint_fingerprint != self._config_fingerprint:
+            raise RunStateError(
+                "Checkpoint fingerprint does not match current training config; start a fresh run."
+            )
+
+        checkpoint_run_id = payload.get("run_id")
+        if self._run_id and checkpoint_run_id and checkpoint_run_id != self._run_id:
+            logger.warning(
+                "Loaded checkpoint run_id (%s) differs from active run (%s)",
+                checkpoint_run_id,
+                self._run_id,
+            )
         self.policy_net.load_state_dict(payload["policy_state_dict"])
         self.target_net.load_state_dict(payload["target_state_dict"])
         self.optimizer.load_state_dict(payload["optimizer_state_dict"])
         self.total_steps = int(payload.get("total_steps", 0))
         self.training_steps = int(payload.get("training_steps", 0))
         self.epsilon = float(payload.get("epsilon", self.config.start_epsilon))
+        self.last_save_step = self.total_steps
+        if self._run_manager:
+            try:
+                self._run_manager.update_progress(self.total_steps, self.training_steps)
+            except RunStateError as exc:
+                logger.warning("Failed to update run manifest after load: %s", exc)
         logger.info("Loaded checkpoint from %s", path)
 
     def inspect_network(self, state: np.ndarray) -> Dict[str, Any]:

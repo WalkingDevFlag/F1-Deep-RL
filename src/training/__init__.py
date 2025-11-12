@@ -2,6 +2,6 @@
 
 """Training module exports."""
 
-from .dqn_trainer import DQNTrainer, TrainingConfig, available_agents
+from .dqn_trainer import DQNTrainer, TrainingConfig, RunStateError, available_agents
 
-__all__ = ["DQNTrainer", "TrainingConfig", "available_agents"]
+__all__ = ["DQNTrainer", "TrainingConfig", "RunStateError", "available_agents"]
