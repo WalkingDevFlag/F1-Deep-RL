@@ -111,6 +111,43 @@ canvas#canvas {
     color: var(--hud-muted);
 }
 
+.ui-card.training-stats-card {
+    position: absolute;
+    top: 380px;
+    left: 20px !important;
+    right: auto !important;
+    z-index: 10;
+}
+
+.training-stats__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 14px;
+}
+
+.training-stats__label {
+    font-weight: 600;
+    color: var(--hud-text);
+}
+
+.training-stats__value {
+    font-weight: 600;
+    color: var(--hud-accent);
+    font-family: 'Courier New', monospace;
+}
+
+.training-card__button--secondary {
+    background: var(--hud-surface);
+    color: var(--hud-text);
+}
+
+.training-card__button--secondary:hover,
+.training-card__button--secondary:focus-visible {
+    background: var(--hud-bg);
+}
+
 .editor-header {
     position: absolute;
     top: 20px;

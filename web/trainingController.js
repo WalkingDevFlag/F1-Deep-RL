@@ -17,7 +17,7 @@
             this.prevDamaged = false;
             this.pendingAutoReset = false;
             this.statusMessage = 'Idle';
-            this.ui = { card: null, select: null, button: null, status: null };
+            this.ui = { card: null, select: null, button: null, status: null, statsCard: null, timeElapsed: null, resetCount: null, currentReward: null, pauseButton: null };
             this.checkpointState = {
                 total: 0,
                 nextIndex: 0,
@@ -28,6 +28,12 @@
             this.prevSteeringAngle = null;
             this.collisionSinceLastLap = false;
             this._agentsLoaded = false;
+            // Stats tracking
+            this.trainingStartTime = null;
+            this.resetCount = 0;
+            this.currentReward = 0;
+            this.totalReward = 0;
+            this.isPaused = false;
         }
 
         async attachUI() {
@@ -36,6 +42,8 @@
             }
             await this.ensureAgentsLoaded();
             const { createCard } = global.UIKit;
+
+            // Control Card
             const card = createCard({ title: 'Training Control', overlay: true, classNames: ['training-card'] });
 
             const agentField = document.createElement('label');
@@ -96,7 +104,63 @@
 
             document.body.appendChild(card.element);
 
-            this.ui = { card, select, button, status };
+            // Stats Card
+            const statsCard = createCard({ title: 'Training Stats', overlay: true, classNames: ['training-stats-card'] });
+
+            const timeElapsedRow = this.createStatRow('Time Elapsed', '00:00:00');
+            const resetCountRow = this.createStatRow('Reset Count', '0');
+            const currentRewardRow = this.createStatRow('Current Reward', '0.00');
+
+            const pauseButton = document.createElement('button');
+            pauseButton.type = 'button';
+            pauseButton.className = 'training-card__button training-card__button--secondary';
+            pauseButton.textContent = 'Pause';
+            pauseButton.disabled = true;
+            pauseButton.addEventListener('click', () => {
+                this.togglePause();
+            });
+
+            statsCard.add(timeElapsedRow);
+            statsCard.add(resetCountRow);
+            statsCard.add(currentRewardRow);
+            statsCard.add(pauseButton);
+
+            document.body.appendChild(statsCard.element);
+
+            this.ui = {
+                card, select, button, status,
+                statsCard, timeElapsed: timeElapsedRow, resetCount: resetCountRow, currentReward: currentRewardRow, pauseButton
+            };
+            this.updateUIState();
+        }
+
+        createStatRow(label, initialValue) {
+            const row = document.createElement('div');
+            row.className = 'training-stats__row';
+
+            const labelEl = document.createElement('span');
+            labelEl.className = 'training-stats__label';
+            labelEl.textContent = label + ':';
+
+            const valueEl = document.createElement('span');
+            valueEl.className = 'training-stats__value';
+            valueEl.textContent = initialValue;
+
+            row.appendChild(labelEl);
+            row.appendChild(valueEl);
+
+            // Add a setValue method to the row
+            row.setValue = (value) => {
+                valueEl.textContent = value;
+            };
+
+            return row;
+        }
+
+        togglePause() {
+            if (!this.enabled) return;
+            this.isPaused = !this.isPaused;
+            this.updateStatus(this.isPaused ? 'Paused' : 'Running');
             this.updateUIState();
         }
 
@@ -140,6 +204,10 @@
             }
             if (this.ui.status) {
                 this.ui.status.textContent = this.statusMessage;
+            }
+            if (this.ui.pauseButton) {
+                this.ui.pauseButton.disabled = !this.enabled;
+                this.ui.pauseButton.textContent = this.isPaused ? 'Resume' : 'Pause';
             }
         }
 
@@ -194,6 +262,12 @@
                 this.checkpointState.nextIndex = 0;
                 this.checkpointState.distanceNorm = 1;
                 this.checkpointState.progressWithinLap = 0;
+                // Initialize stats
+                this.trainingStartTime = performance.now();
+                this.resetCount = 0;
+                this.currentReward = 0;
+                this.totalReward = 0;
+                this.isPaused = false;
                 this.updateStatus('Running');
             } catch (error) {
                 console.error('Failed to start training', error);
@@ -228,6 +302,12 @@
                 this.resetFlag = false;
                 this.prevSteeringAngle = null;
                 this.collisionSinceLastLap = false;
+                // Reset stats
+                this.trainingStartTime = null;
+                this.resetCount = 0;
+                this.currentReward = 0;
+                this.totalReward = 0;
+                this.isPaused = false;
                 this.updateStatus('Idle');
                 this.setUIBusy(false);
                 this.updateUIState();
@@ -242,7 +322,7 @@
         }
 
         getControlKeys(fallbackKeys = {}) {
-            if (!this.enabled) {
+            if (!this.enabled || this.isPaused) {
                 return fallbackKeys;
             }
             const keys = {
@@ -272,7 +352,7 @@
         }
 
         handleFrame({ deltaTime }) {
-            if (!this.enabled || !this.game || !this.game.car) {
+            if (!this.enabled || !this.game || !this.game.car || this.isPaused) {
                 return;
             }
 
@@ -294,6 +374,10 @@
                 reward += this.computeSmoothDrivingReward(deltaTime);
                 reward += this.computeCollisionPenalty();
             }
+
+            // Update current reward
+            this.currentReward = reward;
+            this.totalReward += reward;
 
             const done = !!this.game.car.damaged;
             const sample = {
@@ -324,6 +408,9 @@
 
             this.resetFlag = false;
             this.prevDamaged = this.game.car.damaged;
+
+            // Update UI stats
+            this.updateStatsDisplay();
         }
 
         enqueueSample(sample) {
@@ -599,8 +686,33 @@
             return 0;
         }
 
+        updateStatsDisplay() {
+            if (!this.ui.timeElapsed || !this.ui.resetCount || !this.ui.currentReward) {
+                return;
+            }
+
+            // Update time elapsed
+            if (this.trainingStartTime) {
+                const elapsed = performance.now() - this.trainingStartTime;
+                const seconds = Math.floor(elapsed / 1000);
+                const minutes = Math.floor(seconds / 60);
+                const hours = Math.floor(minutes / 60);
+                const displaySeconds = seconds % 60;
+                const displayMinutes = minutes % 60;
+                const timeString = `${hours.toString().padStart(2, '0')}:${displayMinutes.toString().padStart(2, '0')}:${displaySeconds.toString().padStart(2, '0')}`;
+                this.ui.timeElapsed.setValue(timeString);
+            }
+
+            // Update reset count
+            this.ui.resetCount.setValue(this.resetCount.toString());
+
+            // Update current reward
+            this.ui.currentReward.setValue(this.currentReward.toFixed(2));
+        }
+
         scheduleAutoReset() {
             this.pendingAutoReset = true;
+            this.resetCount++; // Increment reset count
             window.setTimeout(() => {
                 this.game.resetCar();
                 this.pendingAutoReset = false;
