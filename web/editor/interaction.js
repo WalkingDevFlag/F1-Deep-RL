@@ -20,11 +20,25 @@ export function applyInteractionMixin(LevelEditor) {
                     } else if (tool === 'wall') {
                         this.extractWalls();
                     } else if (tool === 'checkpoint') {
-                        this.activateCheckpointTool();
+                        // Toggle checkpoint tool
+                        if (this.currentTool === 'checkpoint') {
+                            this.deactivateTool('checkpoint');
+                            this.activateTool('select');
+                        } else {
+                            this.activateCheckpointTool();
+                        }
                     } else if (tool === 'save') {
                         this.saveGeometry();
                     } else {
-                        this.activateTool(tool);
+                        // Toggle tool activation for regular tools
+                        if (this.currentTool === tool) {
+                            // Tool is already active, deactivate it and go to select mode
+                            this.deactivateTool(tool);
+                            this.activateTool('select');
+                        } else {
+                            // Activate the new tool
+                            this.activateTool(tool);
+                        }
                     }
                 });
             });
