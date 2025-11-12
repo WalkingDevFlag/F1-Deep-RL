@@ -95,6 +95,7 @@ export function applyCheckpointsMixin(LevelEditor) {
         this.markUnsavedChanges();
         this.showToast(`Checkpoint ${checkpoint.id} created`, 'success');
         this.render();
+        this.updateCheckpointsCard();
         return checkpoint;
     };
 
@@ -123,6 +124,7 @@ export function applyCheckpointsMixin(LevelEditor) {
 
         this.markUnsavedChanges();
         this.render();
+        this.updateCheckpointsCard();
     };
 
     LevelEditor.prototype.resizeCheckpoint = function resizeCheckpoint(id, handleId, newX, newY) {
@@ -237,6 +239,7 @@ export function applyCheckpointsMixin(LevelEditor) {
         this.markUnsavedChanges();
         this.showToast(`Checkpoint ${id} deleted`, 'info');
         this.render();
+        this.updateCheckpointsCard();
     };
 
     LevelEditor.prototype.copySelectedCheckpoints = function copySelectedCheckpoints() {
@@ -317,6 +320,7 @@ export function applyCheckpointsMixin(LevelEditor) {
         this.markUnsavedChanges();
         this.showToast(`Pasted ${pastedCheckpoints.length} checkpoint(s)`, 'success');
         this.render();
+        this.updateCheckpointsCard();
     };
 
     LevelEditor.prototype.hitTestCheckpoint = function hitTestCheckpoint(worldX, worldY) {
@@ -609,10 +613,12 @@ export function applyCheckpointsMixin(LevelEditor) {
                     do: () => {
                         Object.assign(checkpoint, finalState);
                         this.render();
+                        this.updateCheckpointsCard();
                     },
                     undo: () => {
                         Object.assign(checkpoint, initial);
                         this.render();
+                        this.updateCheckpointsCard();
                     },
                     description: `${handleLabel} checkpoint ${checkpoint.id}`
                 });

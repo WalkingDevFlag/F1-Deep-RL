@@ -203,6 +203,9 @@ export function applyLoadingMixin(LevelEditor) {
         this.render();
         this.showEditor();
 
+        // Update checkpoints card with loaded data
+        this.updateCheckpointsCard();
+
         // Check for drafts
         this.checkForDraft();
     };
@@ -275,5 +278,6 @@ export function applyLoadingMixin(LevelEditor) {
             }));
         }
         this.render();
+        this.updateCheckpointsCard();
     };
 }

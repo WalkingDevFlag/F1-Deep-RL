@@ -50,6 +50,13 @@ canvas#canvas {
     z-index: 10;
 }
 
+.ui-card--bottom-right {
+    position: absolute;
+    bottom: 120px;
+    right: 20px;
+    z-index: 10;
+}
+
 .ui-card.training-card {
     position: absolute;
     top: 230px;
