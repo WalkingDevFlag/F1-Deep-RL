@@ -62,7 +62,6 @@ web/index.html: there is a duplicated ui-dock__items block (the level-editor too
 Optimizations:
 car.js: extractCarPolygon runs a full image scan on every load (nested loops + neighbor checks across every pixel) producing thousands of points; consider precomputing a simplified outline or using a marching-squares style contour to avoid heavy per-frame transforms and collision checks with oversized polygons.
 car.js: assessDamage steps over every pixel on each polygon edge every frame; a coarse spatial grid or sampling reduction would cut the O(pixels) cost that currently scales with car perimeter and FPS.
-track.js: both extractBorders and findSafeSpawnPoint repeatedly call getImageData and perform large nested loops on the full bitmap; caching the alpha mask once and reusing it (or running extraction on the server/off-thread) would drop the editor/game startup time significantly.
 checkpoints.js: resizing invokes Math.round and trigonometric conversions on every mousemove; tracking deltas in screen space and applying once on mouseup would eliminate the high-frequency trig/allocations.
 renderer.js: drawWalls rebuilds the full path each frame even when geometry is static; caching a Path2D per wall set and reusing it during strokes would reduce draw overhead when wall rendering is toggled on.
 assetLoader.js: loadAssets creates a Promise wrapper around async/await, and the two image onload handlers duplicate resolve logic; leveraging Promise.all on trackImg.decode()/carImg.decode() would simplify and avoid multiple resolve calls.
