@@ -43,8 +43,7 @@ export function applyPersistenceMixin(LevelEditor) {
             meta: {
                 author,
                 notes,
-                source,
-                name: this.currentMeta.name || 'Unknown Track'
+                source
             }
         };
 
