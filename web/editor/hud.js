@@ -577,6 +577,56 @@ export function applyHudMixin(LevelEditor) {
 
         event.preventDefault();
 
+        const checkpointId = checkpointButton.dataset.checkpointId;
+        const selectedIds = Array.isArray(this.editorState.selectedCheckpoints)
+            ? [...this.editorState.selectedCheckpoints]
+            : [];
+        const allButtons = Array.from(this.checkpointsList.querySelectorAll('.checkpoint-button'));
+        const idToButton = new Map(allButtons.map(button => [button.dataset.checkpointId, button]));
+
+        let draggedItems = [];
+
+        if (selectedIds.includes(checkpointId) && selectedIds.length > 1) {
+            draggedItems = selectedIds
+                .map(id => idToButton.get(id))
+                .filter(Boolean);
+        }
+
+        if (draggedItems.length === 0) {
+            draggedItems = [checkpointButton];
+        }
+
+        const uniqueDragged = Array.from(new Set(draggedItems));
+        let orderedDragged = uniqueDragged.sort((a, b) => allButtons.indexOf(a) - allButtons.indexOf(b));
+        const orderedIndices = orderedDragged.map(item => allButtons.indexOf(item)).filter(index => index >= 0);
+        const isContiguous = orderedIndices.every((index, idx) => idx === 0 || index === orderedIndices[idx - 1] + 1);
+        if (!isContiguous) {
+            orderedDragged = [checkpointButton];
+        }
+
+        const draggedRects = orderedDragged.map(item => ({
+            item,
+            rect: item.getBoundingClientRect()
+        }));
+
+        const baseRectEntry = draggedRects.reduce((acc, entry) => {
+            if (!acc || entry.rect.top < acc.rect.top) {
+                return entry;
+            }
+            return acc;
+        }, null);
+
+        const baseRect = baseRectEntry ? baseRectEntry.rect : checkpointButton.getBoundingClientRect();
+        const blockBottom = draggedRects.reduce((bottom, entry) => Math.max(bottom, entry.rect.bottom), baseRect.bottom);
+        const blockHeight = blockBottom - baseRect.top;
+        const relativeOffsets = new Map();
+        draggedRects.forEach(({ item, rect }) => {
+            relativeOffsets.set(item, {
+                x: rect.left - baseRect.left,
+                y: rect.top - baseRect.top
+            });
+        });
+
         const pointerId = event.pointerId;
         if (pointerId !== undefined && checkpointButton.setPointerCapture) {
             try {
@@ -589,7 +639,8 @@ export function applyHudMixin(LevelEditor) {
         this._checkpointDragState = {
             pointerId,
             container: this.checkpointsList,
-            draggedItem: checkpointButton,
+            primaryItem: checkpointButton,
+            draggedItems: orderedDragged,
             startX: event.clientX,
             startY: event.clientY,
             lastX: event.clientX,
@@ -599,7 +650,9 @@ export function applyHudMixin(LevelEditor) {
             idleItems: [],
             itemsGap: 0,
             prevRect: null,
-            draggedHeight: 0,
+            baseRect,
+            blockHeight,
+            relativeOffsets,
             pointerOffsetX: 0,
             pointerOffsetY: 0
         };
@@ -646,7 +699,12 @@ export function applyHudMixin(LevelEditor) {
         state.pointerOffsetX = offsetX;
         state.pointerOffsetY = offsetY;
 
-        state.draggedItem.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+        state.draggedItems.forEach(item => {
+            const offsets = state.relativeOffsets.get(item) || { x: 0, y: 0 };
+            const translateX = offsetX + offsets.x;
+            const translateY = offsetY + offsets.y;
+            item.style.transform = `translate(${translateX}px, ${translateY}px)`;
+        });
 
         this.updateCheckpointDragIdleItems(state);
     };
@@ -661,9 +719,10 @@ export function applyHudMixin(LevelEditor) {
             return;
         }
 
-        if (state.draggedItem && state.pointerId !== undefined && state.draggedItem.releasePointerCapture) {
+        const primaryItem = state.primaryItem;
+        if (primaryItem && state.pointerId !== undefined && primaryItem.releasePointerCapture) {
             try {
-                state.draggedItem.releasePointerCapture(state.pointerId);
+                primaryItem.releasePointerCapture(state.pointerId);
             } catch (releaseError) {
                 // Ignore release errors
             }
@@ -689,26 +748,51 @@ export function applyHudMixin(LevelEditor) {
 
         const items = Array.from(state.container.querySelectorAll('.checkpoint-button'));
         state.items = items;
-        state.idleItems = items.filter(item => item !== state.draggedItem);
-        const draggedIndex = items.indexOf(state.draggedItem);
-        state.draggedIndex = draggedIndex;
+        const draggedSet = new Set(state.draggedItems);
+        state.idleItems = items.filter(item => !draggedSet.has(item));
+        const draggedIndices = state.draggedItems.map(item => items.indexOf(item)).filter(index => index >= 0);
+        state.draggedIndices = draggedIndices;
+        const minDraggedIndex = draggedIndices.length ? Math.min(...draggedIndices) : 0;
+
+        const recalculatedRects = state.draggedItems.map(item => ({
+            item,
+            rect: item.getBoundingClientRect()
+        }));
+
+        if (recalculatedRects.length) {
+            const topEntry = recalculatedRects.reduce((acc, entry) => (entry.rect.top < acc.rect.top ? entry : acc), recalculatedRects[0]);
+            const baseRect = topEntry.rect;
+            const blockBottom = recalculatedRects.reduce((bottom, entry) => Math.max(bottom, entry.rect.bottom), baseRect.bottom);
+            state.baseRect = baseRect;
+            state.blockHeight = blockBottom - baseRect.top;
+            const newOffsets = new Map();
+            recalculatedRects.forEach(({ item, rect }) => {
+                newOffsets.set(item, {
+                    x: rect.left - baseRect.left,
+                    y: rect.top - baseRect.top
+                });
+            });
+            state.relativeOffsets = newOffsets;
+        }
 
         items.forEach((item, index) => {
             item.dataset.dragIndex = String(index);
-            if (item !== state.draggedItem) {
+            if (!draggedSet.has(item)) {
                 item.dataset.dragState = 'idle';
                 item.style.transition = 'transform 0.2s ease';
             }
         });
 
-        state.draggedItem.dataset.dragState = 'dragging';
-        state.draggedItem.classList.add('checkpoint-button--dragging');
-        state.draggedItem.style.transition = 'none';
-        state.draggedItem.style.zIndex = '30';
+        state.draggedItems.forEach(item => {
+            item.dataset.dragState = 'dragging';
+            item.classList.add('checkpoint-button--dragging');
+            item.style.transition = 'none';
+            item.style.zIndex = '30';
+        });
 
         state.idleItems.forEach(item => {
             const itemIndex = items.indexOf(item);
-            if (itemIndex < draggedIndex) {
+            if (itemIndex < minDraggedIndex) {
                 item.dataset.dragIsAbove = 'true';
             } else {
                 item.removeAttribute('data-drag-is-above');
@@ -716,9 +800,7 @@ export function applyHudMixin(LevelEditor) {
             item.removeAttribute('data-drag-is-toggled');
         });
 
-        const rect = state.draggedItem.getBoundingClientRect();
-        state.prevRect = rect;
-        state.draggedHeight = rect.height;
+        state.prevRect = state.primaryItem.getBoundingClientRect();
         state.itemsGap = this.computeCheckpointItemsGap(state);
 
         this.lockCheckpointScroll();
@@ -729,20 +811,20 @@ export function applyHudMixin(LevelEditor) {
             return;
         }
 
-        const draggedRect = state.draggedItem.getBoundingClientRect();
-        const draggedCenterY = draggedRect.top + draggedRect.height / 2;
+        const blockTop = state.baseRect.top + state.pointerOffsetY;
+        const blockCenterY = blockTop + state.blockHeight / 2;
 
         state.idleItems.forEach(item => {
             const itemRect = item.getBoundingClientRect();
             const itemCenterY = itemRect.top + itemRect.height / 2;
             const isAbove = item.hasAttribute('data-drag-is-above');
-            const shouldToggle = isAbove ? draggedCenterY <= itemCenterY : draggedCenterY >= itemCenterY;
+            const shouldToggle = isAbove ? blockCenterY <= itemCenterY : blockCenterY >= itemCenterY;
 
             if (shouldToggle) {
                 if (!item.hasAttribute('data-drag-is-toggled')) {
                     item.dataset.dragIsToggled = 'true';
                     const direction = isAbove ? 1 : -1;
-                    const translate = direction * (state.draggedHeight + state.itemsGap);
+                    const translate = direction * (state.blockHeight + state.itemsGap);
                     item.style.transform = `translateY(${translate}px)`;
                 }
             } else if (item.hasAttribute('data-drag-is-toggled')) {
@@ -757,34 +839,36 @@ export function applyHudMixin(LevelEditor) {
             return;
         }
 
-        const reordered = new Array(state.items.length);
+        const container = state.container;
+        const items = state.items && state.items.length ? state.items : Array.from(container.querySelectorAll('.checkpoint-button'));
+        const draggedItems = state.draggedItems || [state.primaryItem];
+        const draggedSet = new Set(draggedItems);
+        const otherItems = items.filter(item => !draggedSet.has(item));
+        const draggedOrdered = draggedItems.slice().sort((a, b) => items.indexOf(a) - items.indexOf(b));
 
-        state.items.forEach((item, index) => {
-            if (item === state.draggedItem) {
-                return;
-            }
+        const blockTop = state.baseRect.top + state.pointerOffsetY;
+        const blockCenterY = blockTop + state.blockHeight / 2;
 
-            if (!item.hasAttribute('data-drag-is-toggled')) {
-                reordered[index] = item;
-                return;
-            }
-
-            const isAbove = item.hasAttribute('data-drag-is-above');
-            const newIndex = isAbove ? index + 1 : index - 1;
-            reordered[newIndex] = item;
-        });
-
-        for (let index = 0; index < reordered.length; index += 1) {
-            if (!reordered[index]) {
-                reordered[index] = state.draggedItem;
+        let insertIndex = otherItems.length;
+        for (let i = 0; i < otherItems.length; i += 1) {
+            const rect = otherItems[i].getBoundingClientRect();
+            const center = rect.top + rect.height / 2;
+            if (blockCenterY < center) {
+                insertIndex = i;
+                break;
             }
         }
 
-        reordered.forEach(item => {
-            state.container.appendChild(item);
+        const newOrder = [
+            ...otherItems.slice(0, insertIndex),
+            ...draggedOrdered,
+            ...otherItems.slice(insertIndex)
+        ];
+
+        newOrder.forEach(item => {
+            container.appendChild(item);
         });
 
-        // Reset idle item transforms so they slide into their final positions
         state.idleItems.forEach(item => {
             item.style.transition = 'transform 0.2s ease';
             item.style.transform = 'translateY(0px)';
@@ -792,9 +876,9 @@ export function applyHudMixin(LevelEditor) {
             item.removeAttribute('data-drag-is-above');
         });
 
-        const idMap = this.applyCheckpointOrderFromElements(reordered);
+        const idMap = this.applyCheckpointOrderFromElements(newOrder);
 
-        reordered.forEach(item => {
+        newOrder.forEach(item => {
             const oldId = item.dataset.checkpointId;
             const newId = idMap.get(oldId) || oldId;
             if (newId !== oldId) {
@@ -806,32 +890,40 @@ export function applyHudMixin(LevelEditor) {
             }
         });
 
-        const pointerClientX = event.clientX ?? state.lastX;
-        const pointerClientY = event.clientY ?? state.lastY;
-        const offsetX = (pointerClientX ?? state.startX) - state.startX;
-        const offsetY = (pointerClientY ?? state.startY) - state.startY;
+        const animateItems = draggedOrdered.slice();
+        const cleanup = () => {
+            this.resetCheckpointDragState(state);
+            this.updateCheckpointsCard();
+            this.render();
+        };
 
-        state.draggedItem.style.transition = 'none';
+        let pendingAnimations = animateItems.length;
+        if (pendingAnimations === 0) {
+            cleanup();
+            return;
+        }
 
-        requestAnimationFrame(() => {
-            const rect = state.draggedItem.getBoundingClientRect();
-            const yDiff = state.prevRect.top - rect.top;
-            const xDiff = state.prevRect.left - rect.left;
+        animateItems.forEach(item => {
+            const currentRect = item.getBoundingClientRect();
+            item.style.transition = 'none';
+            item.style.transform = '';
+            const targetRect = item.getBoundingClientRect();
+            const deltaX = currentRect.left - targetRect.left;
+            const deltaY = currentRect.top - targetRect.top;
 
-            state.draggedItem.style.transform = `translate(${offsetX + xDiff}px, ${offsetY + yDiff}px)`;
+            item.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
 
             requestAnimationFrame(() => {
-                state.draggedItem.style.transition = 'transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1)';
-                state.draggedItem.style.transform = 'translate(0px, 0px)';
-                state.draggedItem.addEventListener('transitionend', () => {
-                    this.resetCheckpointDragState(state);
-                    this.updateCheckpointsCard();
+                item.style.transition = 'transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                item.style.transform = 'translate(0px, 0px)';
+                item.addEventListener('transitionend', () => {
+                    pendingAnimations -= 1;
+                    if (pendingAnimations === 0) {
+                        cleanup();
+                    }
                 }, { once: true });
             });
         });
-
-        this.unlockCheckpointScroll();
-        this.render();
     };
 
     LevelEditor.prototype.computeCheckpointItemsGap = function computeCheckpointItemsGap(state) {
@@ -893,14 +985,14 @@ export function applyHudMixin(LevelEditor) {
             return;
         }
 
-        if (dragState.draggedItem) {
-            dragState.draggedItem.classList.remove('checkpoint-button--dragging');
-            dragState.draggedItem.dataset.dragState = 'idle';
-            dragState.draggedItem.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease';
-            dragState.draggedItem.style.transform = 'translate(0px, 0px)';
-            dragState.draggedItem.style.zIndex = '';
-            delete dragState.draggedItem.dataset.dragIndex;
-        }
+        (dragState.draggedItems || []).forEach(item => {
+            item.classList.remove('checkpoint-button--dragging');
+            item.dataset.dragState = 'idle';
+            item.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease';
+            item.style.transform = 'translate(0px, 0px)';
+            item.style.zIndex = '';
+            delete item.dataset.dragIndex;
+        });
 
         (dragState.idleItems || []).forEach(item => {
             item.removeAttribute('data-drag-is-above');
