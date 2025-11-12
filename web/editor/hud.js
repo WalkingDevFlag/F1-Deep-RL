@@ -93,6 +93,9 @@ export function applyHudMixin(LevelEditor) {
     this.hudCardContainer.appendChild(hudCard.element);
 
     this.trackNameEl = trackNameRow;
+
+    // Create Keyboard Shortcuts Card
+    this.createKeyboardShortcutsCard();
     };
 
     LevelEditor.prototype.updateTrackLabel = function updateTrackLabel(baseName) {
@@ -232,4 +235,70 @@ export function applyHudMixin(LevelEditor) {
         }
         return raw.replace(/[\t\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
     };
+
+    LevelEditor.prototype.createKeyboardShortcutsCard = function createKeyboardShortcutsCard() {
+        if (!window.UIKit || !this.container) {
+            return;
+        }
+
+        const { createCard } = window.UIKit;
+
+        // Create shortcuts card
+        const shortcutsCard = createCard({ title: 'Keyboard Shortcuts' });
+        shortcutsCard.element.classList.add('ui-card--top-right');
+        shortcutsCard.element.style.top = '96px'; // Position below exit button
+        shortcutsCard.element.setAttribute('aria-label', 'Keyboard Shortcuts');
+
+        // Define shortcuts
+        const shortcuts = [
+            { key: 'S', action: 'Start/Finish Tool' },
+            { key: 'C', action: 'Checkpoint Tool' },
+            { key: 'P', action: 'Toggle Pan Mode' },
+            { key: 'Space', action: 'Temporary Pan (Hold)' },
+            { key: 'Esc', action: 'Cancel/Deselect' },
+            { key: 'Delete', action: 'Delete Selected' },
+            { key: 'F', action: 'Flip Start Direction' },
+            { key: 'Ctrl+Z', action: 'Undo' },
+            { key: 'Ctrl+Y', action: 'Redo' },
+            { key: 'F2/Enter', action: 'Edit Track Name' },
+            { key: 'Shift+Click', action: 'Multi-select Checkpoints' }
+        ];
+
+        // Create shortcut rows
+        shortcuts.forEach(({ key, action }) => {
+            const row = document.createElement('div');
+            row.className = 'ui-row';
+            row.style.display = 'flex';
+            row.style.justifyContent = 'space-between';
+            row.style.alignItems = 'center';
+            row.style.marginBottom = '8px';
+            row.style.fontSize = '13px';
+
+            const keyLabel = document.createElement('kbd');
+            keyLabel.textContent = key;
+            keyLabel.style.padding = '2px 6px';
+            keyLabel.style.border = '1px solid var(--hud-border)';
+            keyLabel.style.borderRadius = '3px';
+            keyLabel.style.backgroundColor = 'var(--hud-surface)';
+            keyLabel.style.fontFamily = 'monospace';
+            keyLabel.style.fontWeight = '600';
+            keyLabel.style.fontSize = '12px';
+            keyLabel.style.color = 'var(--hud-text)';
+
+            const actionLabel = document.createElement('span');
+            actionLabel.textContent = action;
+            actionLabel.style.color = 'var(--hud-muted)';
+            actionLabel.style.fontSize = '13px';
+            actionLabel.style.fontWeight = '600';
+
+            row.appendChild(keyLabel);
+            row.appendChild(actionLabel);
+            shortcutsCard.body.appendChild(row);
+        });
+
+        this.container.appendChild(shortcutsCard.element);
+        this.shortcutsCard = shortcutsCard.element;
+    };
 }
+
+
