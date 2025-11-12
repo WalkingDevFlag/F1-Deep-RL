@@ -831,3 +831,49 @@ canvas#canvas {
     border-radius: 8px;
     background: var(--hud-bg);
 }
+
+/* Neural network overlay */
+.nn-overlay {
+    position: fixed;
+    top: 2vh;
+    left: 50%;
+    transform: translateX(-50%) translateY(-12px);
+    width: min(640px, 40vw);
+    height: min(420px, 38vh);
+    padding: 12px;
+    border-radius: 16px;
+    background: rgba(12, 16, 24, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(18px);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 1200;
+    transition: opacity 160ms ease, transform 220ms ease;
+}
+
+.nn-overlay--visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.nn-overlay__canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.nn-overlay__placeholder {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.92rem;
+    letter-spacing: 0.02em;
+    color: rgba(230, 235, 245, 0.72);
+    text-align: center;
+    padding: 0.5rem 0.75rem;
+    pointer-events: none;
+}

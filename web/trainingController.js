@@ -231,6 +231,9 @@
                 this.updateStatus('Idle');
                 this.setUIBusy(false);
                 this.updateUIState();
+                if (this.game && typeof this.game.clearNeuralSnapshot === 'function') {
+                    this.game.clearNeuralSnapshot();
+                }
             }
         }
 
@@ -363,6 +366,10 @@
             if (typeof sample.prev_action === 'number') {
                 payload.prev_action = sample.prev_action;
             }
+            const wantsSnapshot = this.game && typeof this.game.shouldRequestNeuralSnapshot === 'function'
+                ? this.game.shouldRequestNeuralSnapshot()
+                : false;
+            payload.include_snapshot = wantsSnapshot;
 
             const response = await fetch('/training/step', {
                 method: 'POST',
@@ -381,12 +388,23 @@
                 this.currentAction = data.action;
             }
 
+            if (wantsSnapshot && data && typeof data.network_snapshot === 'object') {
+                if (this.game && typeof this.game.handleNeuralSnapshot === 'function') {
+                    this.game.handleNeuralSnapshot(data.network_snapshot);
+                }
+            } else if (wantsSnapshot && this.game && typeof this.game.markNeuralSnapshotStale === 'function') {
+                this.game.markNeuralSnapshotStale();
+            }
+
             if (data.running === false && this.enabled) {
                 this.enabled = false;
                 this.sampleQueue = [];
                 this.previousStateVector = null;
                 this.updateStatus('Idle');
                 this.updateUIState();
+                if (this.game && typeof this.game.clearNeuralSnapshot === 'function') {
+                    this.game.clearNeuralSnapshot();
+                }
             } else if (data.running) {
                 this.updateStatus('Running');
             }

@@ -3,6 +3,7 @@ import { applyEventMixin } from './mixins/events.js';
 import { applyHudMixin } from './mixins/hud.js';
 import { applyLapTimingMixin } from './mixins/lapTiming.js';
 import { applyLoopMixin } from './mixins/loop.js';
+import { applyNeuralOverlayMixin } from './mixins/neuralOverlay.js';
 
 class Game {
     constructor() {
@@ -26,7 +27,8 @@ class Game {
         this.collisionResetTimeout = null;
         this.lastFrameTime = performance.now();
         this.deltaTime = 0;
-        this.neuralNetworkVisible = true;
+        this.neuralNetworkVisible = false;
+    this.neuralOverlay = null;
         this.uiElements = {};
 
         this.lapCount = 0;
@@ -42,11 +44,13 @@ class Game {
             : null;
 
         this.loop = this.loop.bind(this);
+        this.initializeNeuralOverlay();
     }
 }
 
 applyInitializationMixin(Game);
 applyEventMixin(Game);
+applyNeuralOverlayMixin(Game);
 applyHudMixin(Game);
 applyLapTimingMixin(Game);
 applyLoopMixin(Game);

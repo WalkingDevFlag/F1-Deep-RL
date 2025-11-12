@@ -68,13 +68,22 @@ class TrainerService:
 
     def step(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         with self._lock:
+            state = self._ensure_state_vector(payload.get("state"))
+            include_snapshot = bool(payload.get("include_snapshot", False))
+            network_snapshot: Optional[Dict[str, Any]] = None
+            if include_snapshot:
+                try:
+                    network_snapshot = self._trainer.inspect_network(state)
+                except Exception as exc:  # pragma: no cover - diagnostics only
+                    logger.debug("Failed to build network snapshot: %s", exc)
+
             if not self._trainer.running:
                 response = self.status()
                 response["action"] = self._trainer.default_action()
                 response["running"] = False
+                if network_snapshot is not None:
+                    response["network_snapshot"] = network_snapshot
                 return response
-
-            state = self._ensure_state_vector(payload.get("state"))
 
             prev_state_raw = payload.get("prev_state")
             prev_state = (
@@ -110,6 +119,8 @@ class TrainerService:
                     "metrics": metrics,
                 }
             )
+            if network_snapshot is not None:
+                response["network_snapshot"] = network_snapshot
             return response
 
     def _ensure_state_vector(self, value: Any) -> np.ndarray:

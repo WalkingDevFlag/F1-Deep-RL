@@ -53,10 +53,11 @@ Ai Training:
 4) Stats Card For the AI Training, need to think on what stats i want to see 
 5) Resume Training Logic ig
 6) Reward Calculator
+7) Training Time Elapsed
 
 Bugs:
 web/levelEditor.js: setWallExtractionState calls this.showWallExtractionOverlay() (around the wall extraction toggle), but no such method exists anywhere in the editor mixins—invoking wall extraction currently explodes with a TypeError before any work is done.
-web/car.js: update() integrates acceleration with deltaTime, yet the actual displacement (moveX/moveY) ignores deltaTime, so car speed halves on a 30 FPS machine and doubles on 120 FPS; you already pass deltaTime in but never apply it to the translation. (Fixed)
+(FIXED) web/car.js: update() integrates acceleration with deltaTime, yet the actual displacement (moveX/moveY) ignores deltaTime, so car speed halves on a 30 FPS machine and doubles on 120 FPS; you already pass deltaTime in but never apply it to the translation. (Fixed)
 web/car.js: the boundary clamp still uses the constructor defaults (this.width/this.height) instead of the scaled sprite dimensions from setCarImage; the center is forced at least 32 px/16 px from the edges even if the actual car is wider, making the car feel like it hits invisible walls and still allowing rendered geometry to stick out.
 web/editor/persistence.js: setSavingState rewrites saveButton.textContent to “Saving…”/“Save”, stripping the SVG icon/label/tooltip elements permanently—after the first save the button loses all styling and accessibility structure.
 web/index.html: there is a duplicated ui-dock__items block (the level-editor tool buttons) dropped inside the script section along with stray </nav></div> closers; the page renders invalid DOM and those dead buttons sit in the document tree.

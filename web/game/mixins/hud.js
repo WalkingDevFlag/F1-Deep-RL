@@ -29,6 +29,10 @@ export function applyHudMixin(Game) {
             return;
         }
 
+        if (typeof this.initializeNeuralOverlay === 'function') {
+            this.initializeNeuralOverlay();
+        }
+
         const sensorsEnabled = this.car ? this.car.sensorsEnabled : true;
         const cameraName = this.camera ? this.camera.getModeName() : "God's Eye View";
         const { createCard, createStatRow, createToggleRow, createDock, createDockButton } = window.UIKit;
@@ -89,7 +93,11 @@ export function applyHudMixin(Game) {
             label: 'Neural Net',
             initial: this.neuralNetworkVisible,
             onToggle: (enabled) => {
-                this.neuralNetworkVisible = enabled;
+                if (typeof this.setNeuralNetworkVisible === 'function') {
+                    this.setNeuralNetworkVisible(enabled);
+                } else {
+                    this.neuralNetworkVisible = enabled;
+                }
             }
         });
         const wallsRow = createToggleRow({

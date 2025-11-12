@@ -3,7 +3,7 @@ import os
 import random
 import time
 from dataclasses import dataclass
-from typing import Deque, Dict, Optional, Tuple
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -282,6 +282,56 @@ class DQNTrainer:
         self.training_steps = int(payload.get("training_steps", 0))
         self.epsilon = float(payload.get("epsilon", self.config.start_epsilon))
         logger.info("Loaded checkpoint from %s", path)
+
+    def inspect_network(self, state: np.ndarray) -> Dict[str, Any]:
+        """Capture the current network topology, activations, and weights."""
+        if not isinstance(state, np.ndarray):
+            state = np.asarray(state, dtype=np.float32)
+        else:
+            state = state.astype(np.float32, copy=False)
+
+        modules = list(self.policy_net.model)
+        activation_layers = [np.round(state, 4).tolist()]
+        layer_sizes: List[int] = [self.config.state_size]
+        weight_matrices: List[List[List[float]]] = []
+
+        tensor = torch.from_numpy(state).to(self.device).unsqueeze(0)
+
+        activation_types = (nn.ReLU, nn.Sigmoid, nn.Tanh, nn.LeakyReLU, nn.SELU, nn.ELU, nn.PReLU, nn.Softplus)
+
+        for idx, layer in enumerate(modules):
+            tensor = layer(tensor)
+
+            if isinstance(layer, nn.Linear):
+                weights = layer.weight.detach().cpu().numpy().astype(np.float32)
+                weight_matrices.append(np.transpose(weights).round(4).tolist())
+
+                next_layer = modules[idx + 1] if idx + 1 < len(modules) else None
+                if isinstance(next_layer, activation_types):
+                    continue
+
+                vector = tensor.detach().cpu().squeeze(0).numpy().astype(np.float32)
+                activation_layers.append(np.round(vector, 4).tolist())
+                layer_sizes.append(vector.shape[0])
+            elif isinstance(layer, activation_types):
+                vector = tensor.detach().cpu().squeeze(0).numpy().astype(np.float32)
+                activation_layers.append(np.round(vector, 4).tolist())
+                layer_sizes.append(vector.shape[0])
+
+        max_weight = 1e-6
+        for matrix in weight_matrices:
+            for column in matrix:
+                for value in column:
+                    abs_val = abs(value)
+                    if abs_val > max_weight:
+                        max_weight = abs_val
+
+        return {
+            "layers": layer_sizes,
+            "activations": activation_layers,
+            "weights": weight_matrices,
+            "max_weight": float(round(max_weight, 6)),
+        }
 
 
 def available_agents() -> Dict[str, Dict[str, str]]:
