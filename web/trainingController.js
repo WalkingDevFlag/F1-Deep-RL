@@ -136,14 +136,14 @@
 
         createStatRow(label, initialValue) {
             const row = document.createElement('div');
-            row.className = 'training-stats__row';
+            row.className = 'ui-row ui-row--stat';
 
             const labelEl = document.createElement('span');
-            labelEl.className = 'training-stats__label';
-            labelEl.textContent = label + ':';
+            labelEl.className = 'ui-row__label';
+            labelEl.textContent = label;
 
             const valueEl = document.createElement('span');
-            valueEl.className = 'training-stats__value';
+            valueEl.className = 'ui-row__value';
             valueEl.textContent = initialValue;
 
             row.appendChild(labelEl);
