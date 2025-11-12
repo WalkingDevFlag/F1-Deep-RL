@@ -438,8 +438,9 @@ export function applyHudMixin(LevelEditor) {
             dotsMenu.className = 'checkpoint-dots-menu';
             dotsMenu.textContent = '⠿';
             dotsMenu.style.position = 'absolute';
-            dotsMenu.style.top = '8px';
+            dotsMenu.style.top = '50%';
             dotsMenu.style.right = '12px';
+            dotsMenu.style.transform = 'translateY(-50%)';
             dotsMenu.style.fontSize = '25px';
             dotsMenu.style.fontWeight = '400';
             dotsMenu.style.color = this.editorState.selectedCheckpoints.includes(checkpoint.id) ?
