@@ -230,7 +230,7 @@ class LevelEditor {
 				display: flex;
 				align-items: center;
 				justify-content: center;
-				background: rgba(0, 0, 0, 0.4);
+				background: rgba(0, 0, 0, 0.7);
 				z-index: 10000;
 				color: #fff;
 				font-size: 20px;
