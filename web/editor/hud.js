@@ -256,6 +256,9 @@ export function applyHudMixin(LevelEditor) {
         checkpointsList.style.gap = '8px';
         checkpointsList.style.maxHeight = '300px';
         checkpointsList.style.overflowY = 'auto';
+        checkpointsList.style.overflowX = 'hidden';
+        checkpointsList.style.width = '100%';
+        checkpointsList.style.boxSizing = 'border-box';
 
         checkpointsCard.body.appendChild(checkpointsList);
         this.container.appendChild(checkpointsCard.element);
@@ -292,56 +295,58 @@ export function applyHudMixin(LevelEditor) {
         });
 
         sortedCheckpoints.forEach((checkpoint, index) => {
-            const checkpointRow = document.createElement('div');
-            checkpointRow.className = 'checkpoint-row';
-            checkpointRow.style.display = 'flex';
-            checkpointRow.style.alignItems = 'center';
-            checkpointRow.style.gap = '8px';
-            checkpointRow.style.padding = '8px 12px';
-            checkpointRow.style.borderRadius = '6px';
-            checkpointRow.style.backgroundColor = this.editorState.selectedCheckpoints.includes(checkpoint.id) ?
-                'rgba(45, 140, 240, 0.1)' : 'var(--hud-surface)';
-            checkpointRow.style.border = this.editorState.selectedCheckpoints.includes(checkpoint.id) ?
-                '1px solid var(--hud-accent)' : '1px solid var(--hud-border)';
-            checkpointRow.style.cursor = 'pointer';
-            checkpointRow.style.transition = 'all 0.2s ease';
+            const checkpointButton = document.createElement('button');
+            checkpointButton.type = 'button';
+            checkpointButton.className = 'checkpoint-button';
+            checkpointButton.textContent = checkpoint.id;
+            checkpointButton.style.display = 'flex';
+            checkpointButton.style.alignItems = 'center';
+            checkpointButton.style.justifyContent = 'center';
+            checkpointButton.style.width = '100%';
+            checkpointButton.style.padding = '12px 16px';
+            checkpointButton.style.fontSize = '15px';
+            checkpointButton.style.borderRadius = '8px';
+            checkpointButton.style.border = '2px solid var(--hud-border)';
+            checkpointButton.style.backgroundColor = this.editorState.selectedCheckpoints.includes(checkpoint.id) ?
+                'var(--hud-accent)' : 'var(--hud-surface)';
+            checkpointButton.style.color = this.editorState.selectedCheckpoints.includes(checkpoint.id) ?
+                '#ffffff' : 'var(--hud-text)';
+            checkpointButton.style.fontWeight = '600';
+            checkpointButton.style.cursor = 'pointer';
+            checkpointButton.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease';
+            checkpointButton.style.boxShadow = 'var(--hud-shadow)';
 
-            // Checkpoint number input
-            const numberInput = document.createElement('input');
-            numberInput.type = 'number';
-            numberInput.min = '1';
-            numberInput.max = '999';
-            numberInput.value = parseInt(checkpoint.id.replace('CP', '')) || (index + 1);
-            numberInput.className = 'checkpoint-number';
-            numberInput.style.width = '50px';
-            numberInput.style.padding = '4px 6px';
-            numberInput.style.border = '1px solid var(--hud-border)';
-            numberInput.style.borderRadius = '3px';
-            numberInput.style.backgroundColor = 'var(--hud-bg)';
-            numberInput.style.color = 'var(--hud-text)';
-            numberInput.style.fontSize = '12px';
-            numberInput.style.fontWeight = '600';
-            numberInput.style.textAlign = 'center';
+            // Hover and focus effects
+            checkpointButton.addEventListener('mouseenter', () => {
+                if (!this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
+                    checkpointButton.style.transform = 'translate(-3px, -3px)';
+                    checkpointButton.style.boxShadow = 'none';
+                }
+            });
 
-            // Name input
-            const nameInput = document.createElement('input');
-            nameInput.type = 'text';
-            nameInput.value = checkpoint.meta?.note || checkpoint.id;
-            nameInput.placeholder = checkpoint.id;
-            nameInput.className = 'checkpoint-name';
-            nameInput.style.flex = '1';
-            nameInput.style.padding = '4px 8px';
-            nameInput.style.border = '1px solid var(--hud-border)';
-            nameInput.style.borderRadius = '3px';
-            nameInput.style.backgroundColor = 'var(--hud-bg)';
-            nameInput.style.color = 'var(--hud-text)';
-            nameInput.style.fontSize = '13px';
-            nameInput.style.fontWeight = '500';
+            checkpointButton.addEventListener('mouseleave', () => {
+                if (!this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
+                    checkpointButton.style.transform = 'none';
+                    checkpointButton.style.boxShadow = 'var(--hud-shadow)';
+                }
+            });
 
-            // Event handlers
-            checkpointRow.addEventListener('click', (e) => {
-                if (e.target === numberInput || e.target === nameInput) return;
+            checkpointButton.addEventListener('focus', () => {
+                if (!this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
+                    checkpointButton.style.transform = 'translate(-3px, -3px)';
+                    checkpointButton.style.boxShadow = 'none';
+                }
+            });
 
+            checkpointButton.addEventListener('blur', () => {
+                if (!this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
+                    checkpointButton.style.transform = 'none';
+                    checkpointButton.style.boxShadow = 'var(--hud-shadow)';
+                }
+            });
+
+            // Click handler
+            checkpointButton.addEventListener('click', (e) => {
                 // Toggle selection
                 if (e.shiftKey) {
                     const currentIndex = this.editorState.selectedCheckpoints.indexOf(checkpoint.id);
@@ -357,73 +362,8 @@ export function applyHudMixin(LevelEditor) {
                 this.render();
             });
 
-            numberInput.addEventListener('change', (e) => {
-                const newNumber = parseInt(e.target.value);
-                if (newNumber && newNumber > 0 && newNumber < 1000) {
-                    this.renumberCheckpoint(checkpoint.id, newNumber);
-                } else {
-                    e.target.value = parseInt(checkpoint.id.replace('CP', '')) || (index + 1);
-                }
-            });
-
-            numberInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.target.blur();
-                }
-            });
-
-            nameInput.addEventListener('change', (e) => {
-                this.renameCheckpoint(checkpoint.id, e.target.value.trim());
-            });
-
-            nameInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.target.blur();
-                }
-            });
-
-            checkpointRow.appendChild(numberInput);
-            checkpointRow.appendChild(nameInput);
-            this.checkpointsList.appendChild(checkpointRow);
+            this.checkpointsList.appendChild(checkpointButton);
         });
-    };
-
-    LevelEditor.prototype.renameCheckpoint = function renameCheckpoint(id, newName) {
-        const checkpoint = this.editorState.checkpoints.find(cp => cp.id === id);
-        if (!checkpoint) return;
-
-        if (!checkpoint.meta) checkpoint.meta = {};
-        checkpoint.meta.note = newName;
-        this.markUnsavedChanges();
-        this.updateCheckpointsCard();
-    };
-
-    LevelEditor.prototype.renumberCheckpoint = function renumberCheckpoint(id, newNumber) {
-        const checkpoint = this.editorState.checkpoints.find(cp => cp.id === id);
-        if (!checkpoint) return;
-
-        const newId = `CP${newNumber}`;
-
-        // Check if the new ID already exists
-        if (this.editorState.checkpoints.some(cp => cp.id === newId && cp.id !== id)) {
-            this.showToast(`Checkpoint ${newId} already exists`, 'error');
-            this.updateCheckpointsCard(); // Reset the input
-            return;
-        }
-
-        const oldId = checkpoint.id;
-        checkpoint.id = newId;
-
-        // Update selection if this checkpoint was selected
-        const selIndex = this.editorState.selectedCheckpoints.indexOf(oldId);
-        if (selIndex > -1) {
-            this.editorState.selectedCheckpoints[selIndex] = newId;
-        }
-
-        this.markUnsavedChanges();
-        this.showToast(`Renamed ${oldId} to ${newId}`, 'success');
-        this.updateCheckpointsCard();
-        this.render(); // Update the rendered checkpoint labels
     };
 }
 
