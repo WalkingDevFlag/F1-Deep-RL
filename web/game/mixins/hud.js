@@ -290,7 +290,11 @@ export function applyHudMixin(Game) {
         }
 
         if (this.uiElements.lapTimeRow && typeof this.uiElements.lapTimeRow.setValue === 'function') {
-            if (this.lapStartTime !== null) {
+            // Check if training is paused and use frozen time
+            if (this.trainingController && this.trainingController.isPaused && this.trainingController.pausedElapsedLapTime !== undefined) {
+                const formattedTime = this.formatLapTime(this.trainingController.pausedElapsedLapTime);
+                this.uiElements.lapTimeRow.setValue(formattedTime);
+            } else if (this.lapStartTime !== null) {
                 const lapTimeMs = performance.now() - this.lapStartTime;
                 const formattedTime = this.formatLapTime(lapTimeMs);
                 this.uiElements.lapTimeRow.setValue(formattedTime);
