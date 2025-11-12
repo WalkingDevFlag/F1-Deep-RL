@@ -38,6 +38,9 @@ class Game {
         this.collisionTime = null;
         this.lastCarPosition = { x: 0, y: 0 };
         this.hasPassedStartLine = false;
+        this.pendingLapDisqualification = false;
+        this.lastLapTimeMs = null;
+        this.lapStats = typeof this.loadLapStats === 'function' ? this.loadLapStats() : { tracks: {} };
 
         this.trainingController = typeof window.TrainingController === 'function'
             ? new window.TrainingController(this)

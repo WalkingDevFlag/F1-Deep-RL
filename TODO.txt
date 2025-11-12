@@ -1,8 +1,8 @@
 Things to add:		
 1) Generation Count
 2) Full Body Sensors
-3) Resume Training Logic
 6) Add unit tests
+4) Adding Sound, Sound Toggle as well
 
 Monitoring, logging, and checkpoints
 1) Fix Path outputs for model checkpoints and zip files
@@ -44,22 +44,20 @@ Level Editor Upgrades/Fixes:
 Main Simulation Upgrades/Fixes:
 1) Adding a Auto Drive on Full Speed for Car, no AI. Calculates mid of the whole track and drives on that mid line, will press on W key and W + A and W + D
 2) Fix the Issue/Bug when i change the camera perspective from God's Eye to Car Cam, it Plummets down from 165 to 11 fps......Need to Find and Fix the Bug
-3) 
+3) Take Avg Lap time for each track. If Lap time is closer to 0 than avg lap time, ignore lap time
+4) Invalidating Lap if reverse crosses the Start/Finish Line
 
 Ai Training:
-1) Pause/Play button
-2) Button To let the Latest Trained AI Takeover and Drive
-3) Adding Reset Count (For AI) 
-4) Stats Card For the AI Training, need to think on what stats i want to see 
-5) Resume Training Logic ig
-6) Reward Calculator
-7) Training Time Elapsed
-8) Remove Lap Reward entirely, AI exploiting, till we build a robust Lap Logic and everything. AI Was Exploiting
-9) When i pause Training Everything has to be paused, The Lap Timer Continues to Count the time even after pausing. The Time elapsed does pause but when i resume it adds the elapsed pause time as time and the continues from there onwards. Like if i trained for 30 sec and then pause for 5 and then resume, i expect it to continue from 30 but in reality it starts from 35 sec
+1) Button To let the Latest Trained AI Takeover and Drive
+2) Resume Training Logic ig
+3) Remove Lap Reward entirely, AI exploiting, till we build a robust Lap Logic and everything. AI Was Exploiting. Remove or comment it, in the future once we build a better lap logic we'll add it back ig
+4) When i pause the training and take control, the paused lap timer stays paused, and after resetting when im still in the training mode but have already paused the training, and manually drive the lap timer stays at the time it was paused
+5) Stylizing the Neural Net Visualiser
+6) Recording
+7) 
 
 Bugs:
 web/levelEditor.js: setWallExtractionState calls this.showWallExtractionOverlay() (around the wall extraction toggle), but no such method exists anywhere in the editor mixins—invoking wall extraction currently explodes with a TypeError before any work is done.
-(FIXED) web/car.js: update() integrates acceleration with deltaTime, yet the actual displacement (moveX/moveY) ignores deltaTime, so car speed halves on a 30 FPS machine and doubles on 120 FPS; you already pass deltaTime in but never apply it to the translation. (Fixed)
 web/car.js: the boundary clamp still uses the constructor defaults (this.width/this.height) instead of the scaled sprite dimensions from setCarImage; the center is forced at least 32 px/16 px from the edges even if the actual car is wider, making the car feel like it hits invisible walls and still allowing rendered geometry to stick out.
 web/editor/persistence.js: setSavingState rewrites saveButton.textContent to “Saving…”/“Save”, stripping the SVG icon/label/tooltip elements permanently—after the first save the button loses all styling and accessibility structure.
 web/index.html: there is a duplicated ui-dock__items block (the level-editor tool buttons) dropped inside the script section along with stray </nav></div> closers; the page renders invalid DOM and those dead buttons sit in the document tree.
