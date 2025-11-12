@@ -170,6 +170,10 @@ export function applyPersistenceMixin(LevelEditor) {
     };
 
     LevelEditor.prototype.showSavingOverlay = function showSavingOverlay() {
+        if (typeof this.ensureEditorOverlayStyles === 'function') {
+            this.ensureEditorOverlayStyles();
+        }
+
         let overlay = document.getElementById('saving-overlay');
         if (!overlay) {
             overlay = document.createElement('div');
@@ -185,12 +189,19 @@ export function applyPersistenceMixin(LevelEditor) {
                 align-items: center;
                 justify-content: center;
                 z-index: 10000;
-                color: white;
-                font-size: 24px;
             `;
-            overlay.innerHTML = '<div>Saving...</div>';
             document.body.appendChild(overlay);
         }
+
+        const label = this.createOverlayLabel ?
+            this.createOverlayLabel('Saving…', { duration: '3.8s' }) :
+            (() => {
+                const fallback = document.createElement('div');
+                fallback.textContent = 'Saving…';
+                return fallback;
+            })();
+        overlay.textContent = '';
+        overlay.appendChild(label);
         overlay.style.display = 'flex';
     };
 
