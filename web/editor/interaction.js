@@ -54,7 +54,7 @@ export function applyInteractionMixin(LevelEditor) {
             } else if (e.key.toLowerCase() === 'p' && !e.ctrlKey && !e.metaKey) {
                 e.preventDefault();
                 this.togglePanMode();
-            } else if (e.key === ' ') {
+            } else if (e.key === ' ' && !this.isTitleEditing) {
                 e.preventDefault();
                 this.spaceHeld = true;
                 this.setInteractionMode('pan');
@@ -74,7 +74,7 @@ export function applyInteractionMixin(LevelEditor) {
         });
 
         document.addEventListener('keyup', (e) => {
-            if (e.key === ' ') {
+            if (e.key === ' ' && !this.isTitleEditing) {
                 this.spaceHeld = false;
                 this.restorePreviousMode();
             }

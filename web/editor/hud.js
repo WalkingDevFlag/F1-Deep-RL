@@ -102,12 +102,7 @@ export function applyHudMixin(LevelEditor) {
         }
 
     if (this.headerTitleEl) {
-        const headerSuffix = this.editorState.startLine ? ' (start ready)' : '';
-        if (this.isTitleEditing) {
-            this.headerTitleEl.textContent = baseName;
-        } else {
-            this.headerTitleEl.textContent = `${baseName}${headerSuffix}`;
-        }
+        this.headerTitleEl.textContent = baseName;
     }
     };
 
@@ -120,11 +115,7 @@ export function applyHudMixin(LevelEditor) {
             this.currentMeta = {};
         }
 
-        const headerSuffix = this.editorState.startLine ? ' (start ready)' : '';
-        const currentDisplay = this.headerTitleEl.textContent || '';
-        const currentName = this.currentMeta.name || (headerSuffix && currentDisplay.endsWith(headerSuffix)
-            ? currentDisplay.slice(0, -headerSuffix.length)
-            : currentDisplay.replace(/\s+—\s+start ready$/, '')) || 'Untitled Track';
+        const currentName = this.currentMeta.name || this.headerTitleEl.textContent || 'Untitled Track';
 
         this.isTitleEditing = true;
         this._titleEditOriginalName = currentName;
