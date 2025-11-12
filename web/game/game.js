@@ -35,12 +35,17 @@ class Game {
         this.lapStartTime = null;
         this.currentLapTime = 0;
         this.carHasStartedMoving = false;
-        this.collisionTime = null;
-        this.lastCarPosition = { x: 0, y: 0 };
-        this.hasPassedStartLine = false;
-        this.pendingLapDisqualification = false;
-        this.lastLapTimeMs = null;
-        this.lapStats = typeof this.loadLapStats === 'function' ? this.loadLapStats() : { tracks: {} };
+    this.collisionTime = null;
+    this.lastCarPosition = { x: 0, y: 0 };
+    this.hasPassedStartLine = false;
+    this.pendingLapDisqualification = false;
+    this.lastLapTimeMs = null;
+    this.lapStatsDirty = false;
+    this.lapStatsFlushHandle = null;
+    this.lapStatsLastPersistTime = 0;
+    this.lapStatsUnloadHandlerRegistered = false;
+    this._lapStatsUnloadHandler = null;
+    this.lapStats = typeof this.loadLapStats === 'function' ? this.loadLapStats() : { tracks: {} };
 
         this.trainingController = typeof window.TrainingController === 'function'
             ? new window.TrainingController(this)

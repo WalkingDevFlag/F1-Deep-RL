@@ -4,42 +4,140 @@ const MIN_REALISTIC_LAP_MS = 2000;
 const TRACK_BASELINE_AVERAGES_MS = {
     albert_park_circuit_melbourne_track_transparent: 28000
 };
+const LAP_STATS_DEBOUNCE_MS = 750;
+const LAP_STATS_MIN_FLUSH_INTERVAL_MS = 5000;
+const LAP_STATS_IDLE_TIMEOUT_MS = 1000;
+
+const getNow = () => {
+    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+        return performance.now();
+    }
+    return Date.now();
+};
 
 export function applyLapTimingMixin(Game) {
     Game.prototype.loadLapStats = function loadLapStats() {
-        if (typeof window === 'undefined' || !window.localStorage) {
-            return { tracks: {} };
+        let tracks = {};
+
+        if (typeof window !== 'undefined' && window.localStorage) {
+            try {
+                const stored = window.localStorage.getItem('lapStats');
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (parsed && typeof parsed === 'object' && typeof parsed.tracks === 'object') {
+                        tracks = parsed.tracks;
+                    }
+                }
+            } catch (error) {
+                console.warn('Failed to load lap stats:', error);
+            }
         }
 
-        try {
-            const stored = window.localStorage.getItem('lapStats');
-            if (!stored) {
-                return { tracks: {} };
-            }
-
-            const parsed = JSON.parse(stored);
-            if (!parsed || typeof parsed !== 'object' || typeof parsed.tracks !== 'object') {
-                return { tracks: {} };
-            }
-
-            return { tracks: parsed.tracks };
-        } catch (error) {
-            console.warn('Failed to load lap stats:', error);
-            return { tracks: {} };
-        }
+        this.registerLapStatsUnloadHandler();
+        return { tracks };
     };
 
-    Game.prototype.saveLapStats = function saveLapStats() {
+    Game.prototype.registerLapStatsUnloadHandler = function registerLapStatsUnloadHandler() {
+        if (typeof window === 'undefined' || this.lapStatsUnloadHandlerRegistered) {
+            return;
+        }
+
+        if (!this._lapStatsUnloadHandler) {
+            this._lapStatsUnloadHandler = () => {
+                this.saveLapStats({ immediate: true });
+            };
+        }
+
+        window.addEventListener('beforeunload', this._lapStatsUnloadHandler);
+        window.addEventListener('pagehide', this._lapStatsUnloadHandler);
+        this.lapStatsUnloadHandlerRegistered = true;
+    };
+
+    Game.prototype.cancelLapStatsFlush = function cancelLapStatsFlush() {
+        if (!this.lapStatsFlushHandle || typeof window === 'undefined') {
+            return;
+        }
+
+        if (this.lapStatsFlushHandle.type === 'timeout') {
+            window.clearTimeout(this.lapStatsFlushHandle.handle);
+        } else if (this.lapStatsFlushHandle.type === 'idle' && typeof window.cancelIdleCallback === 'function') {
+            window.cancelIdleCallback(this.lapStatsFlushHandle.handle);
+        }
+
+        this.lapStatsFlushHandle = null;
+    };
+
+    Game.prototype.writeLapStatsToStorage = function writeLapStatsToStorage() {
+        if (!this.lapStatsDirty) {
+            return;
+        }
+
         if (typeof window === 'undefined' || !window.localStorage) {
+            this.lapStatsDirty = false;
             return;
         }
 
         try {
             const tracks = this.lapStats && this.lapStats.tracks ? this.lapStats.tracks : {};
             window.localStorage.setItem('lapStats', JSON.stringify({ tracks }));
+            this.lapStatsDirty = false;
+            this.lapStatsLastPersistTime = getNow();
         } catch (error) {
             console.warn('Failed to save lap stats:', error);
         }
+    };
+
+    Game.prototype.scheduleLapStatsFlush = function scheduleLapStatsFlush() {
+        if (typeof window === 'undefined' || !this.lapStatsDirty) {
+            return;
+        }
+
+        this.registerLapStatsUnloadHandler();
+
+        let delay = LAP_STATS_DEBOUNCE_MS;
+        if (this.lapStatsLastPersistTime > 0) {
+            const elapsed = getNow() - this.lapStatsLastPersistTime;
+            if (elapsed < LAP_STATS_MIN_FLUSH_INTERVAL_MS) {
+                delay = Math.max(LAP_STATS_MIN_FLUSH_INTERVAL_MS - elapsed, LAP_STATS_DEBOUNCE_MS);
+            }
+        }
+
+        if (this.lapStatsFlushHandle) {
+            this.cancelLapStatsFlush();
+        }
+
+        const fire = () => {
+            this.lapStatsFlushHandle = null;
+            if (!this.lapStatsDirty) {
+                return;
+            }
+            this.writeLapStatsToStorage();
+        };
+
+        if (typeof window.requestIdleCallback === 'function') {
+            const handle = window.requestIdleCallback(() => fire(), { timeout: delay + LAP_STATS_IDLE_TIMEOUT_MS });
+            this.lapStatsFlushHandle = { type: 'idle', handle };
+        } else {
+            const handle = window.setTimeout(fire, delay);
+            this.lapStatsFlushHandle = { type: 'timeout', handle };
+        }
+    };
+
+    Game.prototype.saveLapStats = function saveLapStats(options = {}) {
+        const immediate = options && options.immediate;
+
+        if (immediate) {
+            this.cancelLapStatsFlush();
+            if (!this.lapStatsDirty) {
+                return;
+            }
+
+            this.writeLapStatsToStorage();
+            return;
+        }
+
+        this.lapStatsDirty = true;
+        this.scheduleLapStatsFlush();
     };
 
     Game.prototype.ensureTrackStats = function ensureTrackStats() {

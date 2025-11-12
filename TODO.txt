@@ -44,14 +44,11 @@ Level Editor Upgrades/Fixes:
 Main Simulation Upgrades/Fixes:
 1) Adding a Auto Drive on Full Speed for Car, no AI. Calculates mid of the whole track and drives on that mid line, will press on W key and W + A and W + D
 2) Fix the Issue/Bug when i change the camera perspective from God's Eye to Car Cam, it Plummets down from 165 to 11 fps......Need to Find and Fix the Bug
-3) Take Avg Lap time for each track. If Lap time is closer to 0 than avg lap time, ignore lap time
-4) Invalidating Lap if reverse crosses the Start/Finish Line
 
 Ai Training:
 1) Button To let the Latest Trained AI Takeover and Drive
 2) Resume Training Logic ig
 3) Remove Lap Reward entirely, AI exploiting, till we build a robust Lap Logic and everything. AI Was Exploiting. Remove or comment it, in the future once we build a better lap logic we'll add it back ig
-4) When i pause the training and take control, the paused lap timer stays paused, and after resetting when im still in the training mode but have already paused the training, and manually drive the lap timer stays at the time it was paused
 5) Stylizing the Neural Net Visualiser
 6) Recording
 7) 
