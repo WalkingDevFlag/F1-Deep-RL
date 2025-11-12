@@ -552,7 +552,7 @@
             let checkpointReward = 0;
 
             if (distance <= captureRadius) {
-                checkpointReward = 10;
+                checkpointReward = 11;
                 this.checkpointState.totalCleared += 1;
                 this.checkpointState.nextIndex = (nextIndex + 1) % total;
             } else {
@@ -577,7 +577,7 @@
             const delta = progressWithinLap - this.prevProgressWithinLap;
             let reward = 0;
             if (delta > 0) {
-                reward += delta * 20;
+                reward += delta * 22;
             } else if (delta < -0.5 && this.resetFlag) {
                 reward += 0;
             } else if (delta < 0) {
@@ -601,9 +601,9 @@
                 this.checkpointState.nextIndex = 0;
                 this.checkpointState.distanceNorm = 1;
                 this.checkpointState.progressWithinLap = 0;
-                let reward = delta * 50;
+                let reward = delta * 55;
                 if (!this.collisionSinceLastLap) {
-                    reward += 20;
+                    reward += 22;
                 }
                 this.collisionSinceLastLap = false;
                 return reward;
@@ -621,7 +621,7 @@
             const speed = car.speed || 0;
             const maxSpeed = car.maxSpeed || 1;
             const forward = Math.max(0, speed / maxSpeed);
-            const speedReward = forward * 5 * dt;
+            const speedReward = forward * 5.5 * dt;
             const timePenalty = -0.5 * dt;
             return speedReward + timePenalty;
         }
@@ -642,7 +642,7 @@
             this.prevSteeringAngle = angle;
             const steadyTolerance = 0.6;
             const smoothness = Math.max(0, steadyTolerance - angularVelocity);
-            return smoothness * 4 * dt;
+            return smoothness * 4.4 * dt;
         }
 
         computeCollisionPenalty() {
