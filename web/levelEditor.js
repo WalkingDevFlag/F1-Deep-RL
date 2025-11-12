@@ -62,6 +62,9 @@ class LevelEditor {
 		this.hasUnsavedChanges = false;
 		this.isOnline = navigator.onLine;
 		this.pendingSave = null;
+
+		this.isTitleEditing = false;
+		this._titleEditOriginalName = '';
 	}
 
 	initialize() {
