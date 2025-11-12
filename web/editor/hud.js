@@ -259,6 +259,17 @@ export function applyHudMixin(LevelEditor) {
         checkpointsList.style.overflowX = 'hidden';
         checkpointsList.style.width = '100%';
         checkpointsList.style.boxSizing = 'border-box';
+        // Hide scroll bar but keep scrolling functionality
+        checkpointsList.style.scrollbarWidth = 'none'; // Firefox
+        checkpointsList.style.msOverflowStyle = 'none'; // IE/Edge
+        // WebKit browsers (Chrome, Safari, newer Edge)
+        const webkitScrollbarStyle = document.createElement('style');
+        webkitScrollbarStyle.textContent = `
+            .checkpoints-list::-webkit-scrollbar {
+                display: none;
+            }
+        `;
+        document.head.appendChild(webkitScrollbarStyle);
 
         checkpointsCard.body.appendChild(checkpointsList);
         this.container.appendChild(checkpointsCard.element);
@@ -316,6 +327,36 @@ export function applyHudMixin(LevelEditor) {
             checkpointButton.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease';
             checkpointButton.style.boxShadow = 'var(--hud-shadow)';
 
+            // Make draggable
+            checkpointButton.draggable = true;
+            checkpointButton.dataset.checkpointId = checkpoint.id;
+
+            // Drag and drop event handlers
+            checkpointButton.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', checkpoint.id);
+                e.dataTransfer.effectAllowed = 'move';
+                checkpointButton.style.opacity = '0.5';
+            });
+
+            checkpointButton.addEventListener('dragend', (e) => {
+                checkpointButton.style.opacity = '1';
+            });
+
+            checkpointButton.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+            });
+
+            checkpointButton.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const draggedId = e.dataTransfer.getData('text/plain');
+                const targetId = checkpoint.id;
+
+                if (draggedId !== targetId) {
+                    this.reorderCheckpoints(draggedId, targetId);
+                }
+            });
+
             // Hover and focus effects
             checkpointButton.addEventListener('mouseenter', () => {
                 if (!this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
@@ -345,10 +386,12 @@ export function applyHudMixin(LevelEditor) {
                 }
             });
 
-            // Click handler
+            // Click handler - toggle selection
             checkpointButton.addEventListener('click', (e) => {
-                // Toggle selection
+                e.stopPropagation();
+
                 if (e.shiftKey) {
+                    // Multi-select with shift
                     const currentIndex = this.editorState.selectedCheckpoints.indexOf(checkpoint.id);
                     if (currentIndex > -1) {
                         this.editorState.selectedCheckpoints.splice(currentIndex, 1);
@@ -356,7 +399,14 @@ export function applyHudMixin(LevelEditor) {
                         this.editorState.selectedCheckpoints.push(checkpoint.id);
                     }
                 } else {
-                    this.editorState.selectedCheckpoints = [checkpoint.id];
+                    // Single select - toggle
+                    if (this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
+                        // If already selected, deselect it
+                        this.editorState.selectedCheckpoints = [];
+                    } else {
+                        // Select only this one
+                        this.editorState.selectedCheckpoints = [checkpoint.id];
+                    }
                 }
                 this.updateCheckpointsCard();
                 this.render();
@@ -364,6 +414,34 @@ export function applyHudMixin(LevelEditor) {
 
             this.checkpointsList.appendChild(checkpointButton);
         });
+    };
+
+    LevelEditor.prototype.reorderCheckpoints = function reorderCheckpoints(draggedId, targetId) {
+        const draggedIndex = this.editorState.checkpoints.findIndex(cp => cp.id === draggedId);
+        const targetIndex = this.editorState.checkpoints.findIndex(cp => cp.id === targetId);
+
+        if (draggedIndex === -1 || targetIndex === -1) return;
+
+        // Remove dragged checkpoint and insert at new position
+        const [draggedCheckpoint] = this.editorState.checkpoints.splice(draggedIndex, 1);
+        this.editorState.checkpoints.splice(targetIndex, 0, draggedCheckpoint);
+
+        // Renumber all checkpoints sequentially
+        this.editorState.checkpoints.forEach((checkpoint, index) => {
+            const oldId = checkpoint.id;
+            const newId = `CP${index + 1}`;
+            checkpoint.id = newId;
+
+            // Update selection if this checkpoint was selected
+            const selIndex = this.editorState.selectedCheckpoints.indexOf(oldId);
+            if (selIndex > -1) {
+                this.editorState.selectedCheckpoints[selIndex] = newId;
+            }
+        });
+
+        this.markUnsavedChanges();
+        this.updateCheckpointsCard();
+        this.render();
     };
 }
 
