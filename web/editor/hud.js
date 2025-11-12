@@ -326,6 +326,41 @@ export function applyHudMixin(LevelEditor) {
             checkpointButton.style.cursor = 'pointer';
             checkpointButton.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease';
             checkpointButton.style.boxShadow = 'var(--hud-shadow)';
+            checkpointButton.style.position = 'relative';
+
+            // Create 3 dots menu
+            const dotsMenu = document.createElement('div');
+            dotsMenu.className = 'checkpoint-dots-menu';
+            dotsMenu.textContent = '⋮';
+            dotsMenu.style.position = 'absolute';
+            dotsMenu.style.top = '8px';
+            dotsMenu.style.right = '12px';
+            dotsMenu.style.fontSize = '16px';
+            dotsMenu.style.fontWeight = '700';
+            dotsMenu.style.color = this.editorState.selectedCheckpoints.includes(checkpoint.id) ?
+                '#ffffff' : 'var(--hud-text)';
+            dotsMenu.style.opacity = '0';
+            dotsMenu.style.transition = 'opacity 0.2s ease';
+            dotsMenu.style.cursor = 'pointer';
+            dotsMenu.style.userSelect = 'none';
+            dotsMenu.style.pointerEvents = 'auto';
+
+            // Show dots on button hover
+            checkpointButton.addEventListener('mouseenter', () => {
+                if (!this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
+                    checkpointButton.style.transform = 'translate(-3px, -3px)';
+                    checkpointButton.style.boxShadow = 'none';
+                }
+                dotsMenu.style.opacity = '1';
+            });
+
+            checkpointButton.addEventListener('mouseleave', () => {
+                if (!this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
+                    checkpointButton.style.transform = 'none';
+                    checkpointButton.style.boxShadow = 'var(--hud-shadow)';
+                }
+                dotsMenu.style.opacity = '0';
+            });
 
             // Make draggable
             checkpointButton.draggable = true;
@@ -357,21 +392,6 @@ export function applyHudMixin(LevelEditor) {
                 }
             });
 
-            // Hover and focus effects
-            checkpointButton.addEventListener('mouseenter', () => {
-                if (!this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
-                    checkpointButton.style.transform = 'translate(-3px, -3px)';
-                    checkpointButton.style.boxShadow = 'none';
-                }
-            });
-
-            checkpointButton.addEventListener('mouseleave', () => {
-                if (!this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
-                    checkpointButton.style.transform = 'none';
-                    checkpointButton.style.boxShadow = 'var(--hud-shadow)';
-                }
-            });
-
             checkpointButton.addEventListener('focus', () => {
                 if (!this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
                     checkpointButton.style.transform = 'translate(-3px, -3px)';
@@ -389,6 +409,9 @@ export function applyHudMixin(LevelEditor) {
             // Click handler - toggle selection
             checkpointButton.addEventListener('click', (e) => {
                 e.stopPropagation();
+
+                // Don't select if clicking on dots menu
+                if (e.target === dotsMenu) return;
 
                 if (e.shiftKey) {
                     // Multi-select with shift
@@ -412,6 +435,14 @@ export function applyHudMixin(LevelEditor) {
                 this.render();
             });
 
+            // Dots menu click handler
+            dotsMenu.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // For now, just show a simple alert - can be expanded later
+                alert(`Options for ${checkpoint.id}`);
+            });
+
+            checkpointButton.appendChild(dotsMenu);
             this.checkpointsList.appendChild(checkpointButton);
         });
     };
