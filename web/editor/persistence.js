@@ -142,7 +142,16 @@ export function applyPersistenceMixin(LevelEditor) {
         const saveButton = this.dock ? this.dock.querySelector('[data-tool="save"]') : null;
         if (saveButton) {
             saveButton.disabled = saving;
-            saveButton.textContent = saving ? 'Saving...' : 'Save';
+
+            const label = saveButton.querySelector('.ui-dock__label');
+            if (label) {
+                label.textContent = saving ? 'Saving...' : 'Save';
+            }
+
+            const tooltip = saveButton.querySelector('.ui-dock__tooltip');
+            if (tooltip) {
+                tooltip.textContent = saving ? 'Saving...' : 'Save';
+            }
         }
 
         // Disable other tools during save
