@@ -14,6 +14,7 @@ class Renderer {
         this.showCheckpoints = false;
         // Start/Finish line rendering toggle (default OFF for performance)
         this.showStartFinish = false;
+        this.wallPathCache = new WeakMap();
     }
 
     drawFrame(trackImg, car, carImg, camera, track = null) {
@@ -61,6 +62,35 @@ class Renderer {
         this.drawHUD(car, camera);
     }
 
+    buildWallPath(path, walls) {
+        for (const wall of walls) {
+            if (wall.polyline && Array.isArray(wall.polyline) && wall.polyline.length >= 2) {
+                path.moveTo(wall.polyline[0][0], wall.polyline[0][1]);
+
+                for (let i = 1; i < wall.polyline.length; i++) {
+                    path.lineTo(wall.polyline[i][0], wall.polyline[i][1]);
+                }
+            }
+        }
+
+        return path;
+    }
+
+    getCachedWallPath(track, walls) {
+        if (typeof Path2D !== 'function') {
+            return null;
+        }
+
+        const cached = this.wallPathCache.get(track);
+        if (cached && cached.walls === walls) {
+            return cached.path;
+        }
+
+        const path = this.buildWallPath(new Path2D(), walls);
+        this.wallPathCache.set(track, { walls, path });
+        return path;
+    }
+
     drawWalls(track) {
         const walls = track.getWalls();
         if (!walls || walls.length === 0) return;
@@ -71,21 +101,17 @@ class Renderer {
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
 
-        // Batch all walls into a single path for better performance
-        this.ctx.beginPath();
-        
-        for (const wall of walls) {
-            if (wall.polyline && Array.isArray(wall.polyline) && wall.polyline.length >= 2) {
-                this.ctx.moveTo(wall.polyline[0][0], wall.polyline[0][1]);
-                
-                for (let i = 1; i < wall.polyline.length; i++) {
-                    this.ctx.lineTo(wall.polyline[i][0], wall.polyline[i][1]);
-                }
-            }
+        const cachedPath = this.getCachedWallPath(track, walls);
+
+        if (cachedPath) {
+            this.ctx.stroke(cachedPath);
+        } else {
+            // Fallback for environments without Path2D support
+            this.ctx.beginPath();
+            this.buildWallPath(this.ctx, walls);
+            this.ctx.stroke();
         }
-        
-        // Single stroke call for all walls
-        this.ctx.stroke();
+
         this.ctx.restore();
     }
 
