@@ -45,6 +45,9 @@ export function applyCheckpointsMixin(LevelEditor) {
         }
     };
 
+    // Initialize clipboard for checkpoints
+    LevelEditor.prototype.checkpointClipboard = null;
+
     LevelEditor.prototype.activateCheckpointTool = function activateCheckpointTool() {
         this.activateTool('checkpoint');
     };
@@ -233,6 +236,86 @@ export function applyCheckpointsMixin(LevelEditor) {
 
         this.markUnsavedChanges();
         this.showToast(`Checkpoint ${id} deleted`, 'info');
+        this.render();
+    };
+
+    LevelEditor.prototype.copySelectedCheckpoints = function copySelectedCheckpoints() {
+        if (this.editorState.selectedCheckpoints.length === 0) {
+            this.showToast('No checkpoints selected to copy', 'info');
+            return;
+        }
+
+        // Copy the selected checkpoints with their relative positions
+        const selectedCheckpoints = this.editorState.selectedCheckpoints.map(id =>
+            this.editorState.checkpoints.find(cp => cp.id === id)
+        ).filter(cp => cp);
+
+        if (selectedCheckpoints.length === 0) return;
+
+        // Calculate the center of the selected checkpoints for relative positioning
+        const centerX = selectedCheckpoints.reduce((sum, cp) => sum + cp.x, 0) / selectedCheckpoints.length;
+        const centerY = selectedCheckpoints.reduce((sum, cp) => sum + cp.y, 0) / selectedCheckpoints.length;
+
+        // Store copies with relative positions
+        this.checkpointClipboard = selectedCheckpoints.map(cp => ({
+            ...cp,
+            id: null, // Will be assigned new ID when pasted
+            x: cp.x - centerX,
+            y: cp.y - centerY,
+            meta: {
+                ...cp.meta,
+                copiedAt: new Date().toISOString(),
+                originalId: cp.id
+            }
+        }));
+
+        this.showToast(`Copied ${selectedCheckpoints.length} checkpoint(s)`, 'success');
+    };
+
+    LevelEditor.prototype.pasteCheckpoints = function pasteCheckpoints(targetX, targetY) {
+        if (!this.checkpointClipboard || this.checkpointClipboard.length === 0) {
+            this.showToast('No checkpoints in clipboard', 'info');
+            return;
+        }
+
+        const pastedCheckpoints = [];
+        const prevCheckpoints = [...this.editorState.checkpoints];
+
+        // Paste each checkpoint with new IDs and positions
+        for (const clipboardCp of this.checkpointClipboard) {
+            const newCheckpoint = {
+                ...clipboardCp,
+                id: this.getNextCheckpointId(),
+                x: Math.round(targetX + clipboardCp.x),
+                y: Math.round(targetY + clipboardCp.y),
+                meta: {
+                    ...clipboardCp.meta,
+                    pastedAt: new Date().toISOString()
+                }
+            };
+            this.editorState.checkpoints.push(newCheckpoint);
+            pastedCheckpoints.push(newCheckpoint);
+        }
+
+        // Select the newly pasted checkpoints
+        this.editorState.selectedCheckpoints = pastedCheckpoints.map(cp => cp.id);
+
+        this.pushAction({
+            do: () => {
+                this.editorState.checkpoints = [...prevCheckpoints, ...pastedCheckpoints];
+                this.editorState.selectedCheckpoints = pastedCheckpoints.map(cp => cp.id);
+                this.render();
+            },
+            undo: () => {
+                this.editorState.checkpoints = prevCheckpoints;
+                this.editorState.selectedCheckpoints = [];
+                this.render();
+            },
+            description: `Paste ${pastedCheckpoints.length} checkpoint(s)`
+        });
+
+        this.markUnsavedChanges();
+        this.showToast(`Pasted ${pastedCheckpoints.length} checkpoint(s)`, 'success');
         this.render();
     };
 
