@@ -25,33 +25,28 @@ New reward policies & penalties:
 
 Level Editor Upgrades/Fixes:
 1) Fixing the fact that if i upload a PNG then it correctly uploads PNG in the Editor but if i upload a SVG it shows no image available ig
-2) Fixing the Icons on the Dock
-3) Should load the geometry.json for the track. If no geometry means new track. If not then should load old geometry configurations for walls and checkpoints and start/finish
-4) Start Finish Not moving currently
-5) On the Dock, when i click on the button it turns to text and all fix that shit
-6) Allow me to Rename the Track by clicking on the top left text editing it over there
-7) Erase Wall Borders
-8) Standardise Track Layout Sizes
-9) Fix Checkpoints functions, like copy pasting checkpoints
-10) All Keyboard Shortcuts to be standardised
-11) Renderes a checkered Flag on the start and Finish
-12) Remove Test Drive Button
-13) Remove "Editing: Track Name" from Hud
-14) Change Overlay text to use Shiny Text As loading
-15) Make Overlay Darker
+2) Erase Wall Borders
+3) Standardise Track Layout Sizes
+4) Renderes a checkered Flag on the start and Finish
+5) Remove Test Drive Button
+6) Remove "Editing: Track Name" from Hud
+7) Change Overlay text to use Shiny Text As loading
+8) Make Overlay Darker
+9) Remove Select Button, Or Disable it for now ig, Has Functionality, like it does allow me to select and delete checkpoints and Edit or Resize them, but i want it happen without the button, so when im in Pan/Zoom and i select the checkpoint, can select multiple as well as delete as well as resize
+10) Modal Appears to confirm Deletion Action of Checkpoints, "Are you sure you want to delete this Checkpoint?" or "Are you sure you want to delete X Checkpoints?", bolden the word delete in both, 2 button Confirm and Cancel
+
 
 
 Main Simulation Upgrades/Fixes:
 1) Adding a Auto Drive on Full Speed for Car, no AI. Calculates mid of the whole track and drives on that mid line, will press on W key and W + A and W + D
-2) Fix the Issue/Bug when i change the camera perspective from God's Eye to Car Cam, it Plummets down from 165 to 11 fps......Need to Find and Fix the Bug
+2) Fix the Issue/Bug when i change the camera perspective from God's Eye to Car Cam, it Plummets down from 165 to 11 fps......Need to Find and Fix the Bug, Still think its cuz of the Track Size
 
 Ai Training:
 1) Button To let the Latest Trained AI Takeover and Drive
 2) Resume Training Logic ig
-3) Remove Lap Reward entirely, AI exploiting, till we build a robust Lap Logic and everything. AI Was Exploiting. Remove or comment it, in the future once we build a better lap logic we'll add it back ig
-5) Stylizing the Neural Net Visualiser
-6) Recording
-7) 
+3) Stylizing the Neural Net Visualiser
+4) Recording
+5) 
 
 Reward Policies:
 1) Adding a Penality if it crashes Very Early. Similar to lap logic, the Time it crashed is closer to 0 than the Avg Track Lap time, penalty

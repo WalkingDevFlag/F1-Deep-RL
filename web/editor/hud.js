@@ -433,17 +433,17 @@ export function applyHudMixin(LevelEditor) {
             label.style.pointerEvents = 'none';
             checkpointButton.appendChild(label);
 
-            // Create 3 dots menu
+            // Create drag handle
             const dotsMenu = document.createElement('div');
             dotsMenu.className = 'checkpoint-dots-menu';
-            dotsMenu.textContent = '⋮';
+            dotsMenu.textContent = '⠿';
             dotsMenu.style.position = 'absolute';
             dotsMenu.style.top = '8px';
             dotsMenu.style.right = '12px';
-            dotsMenu.style.fontSize = '16px';
-            dotsMenu.style.fontWeight = '700';
+            dotsMenu.style.fontSize = '25px';
+            dotsMenu.style.fontWeight = '400';
             dotsMenu.style.color = this.editorState.selectedCheckpoints.includes(checkpoint.id) ?
-                '#ffffff' : 'var(--hud-text)';
+                '#ffffff' : '#00000099';
             dotsMenu.style.opacity = '0';
             dotsMenu.style.transition = 'opacity 0.2s ease';
             dotsMenu.style.cursor = 'grab';
