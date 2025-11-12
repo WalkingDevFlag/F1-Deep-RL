@@ -53,6 +53,11 @@ Ai Training:
 6) Recording
 7) 
 
+Reward Policies:
+1) Adding a Penality if it crashes Very Early. Similar to lap logic, the Time it crashed is closer to 0 than the Avg Track Lap time, penalty
+2) 
+
+
 Bugs:
 web/levelEditor.js: setWallExtractionState calls this.showWallExtractionOverlay() (around the wall extraction toggle), but no such method exists anywhere in the editor mixins—invoking wall extraction currently explodes with a TypeError before any work is done.
 web/car.js: the boundary clamp still uses the constructor defaults (this.width/this.height) instead of the scaled sprite dimensions from setCarImage; the center is forced at least 32 px/16 px from the edges even if the actual car is wider, making the car feel like it hits invisible walls and still allowing rendered geometry to stick out.
@@ -63,5 +68,4 @@ Optimizations:
 car.js: extractCarPolygon runs a full image scan on every load (nested loops + neighbor checks across every pixel) producing thousands of points; consider precomputing a simplified outline or using a marching-squares style contour to avoid heavy per-frame transforms and collision checks with oversized polygons.
 car.js: assessDamage steps over every pixel on each polygon edge every frame; a coarse spatial grid or sampling reduction would cut the O(pixels) cost that currently scales with car perimeter and FPS.
 checkpoints.js: resizing invokes Math.round and trigonometric conversions on every mousemove; tracking deltas in screen space and applying once on mouseup would eliminate the high-frequency trig/allocations.
-renderer.js: drawWalls rebuilds the full path each frame even when geometry is static; caching a Path2D per wall set and reusing it during strokes would reduce draw overhead when wall rendering is toggled on.
 assetLoader.js: loadAssets creates a Promise wrapper around async/await, and the two image onload handlers duplicate resolve logic; leveraging Promise.all on trackImg.decode()/carImg.decode() would simplify and avoid multiple resolve calls.

@@ -17,7 +17,7 @@
             this.prevDamaged = false;
             this.pendingAutoReset = false;
             this.statusMessage = 'Idle';
-            this.ui = { card: null, select: null, button: null, status: null, statsCard: null, timeElapsed: null, resetCount: null, currentReward: null, pauseButton: null };
+            this.ui = { card: null, select: null, button: null, status: null, statsCard: null, timeElapsed: null, resetCount: null, episodeReward: null, pauseButton: null };
             this.checkpointState = {
                 total: 0,
                 nextIndex: 0,
@@ -112,7 +112,7 @@
 
             const timeElapsedRow = this.createStatRow('Time Elapsed', '00:00:00');
             const resetCountRow = this.createStatRow('Reset Count', '0');
-            const currentRewardRow = this.createStatRow('Current Reward', '0.00');
+            const episodeRewardRow = this.createStatRow('Episode Reward', '0.00');
 
             const pauseButton = document.createElement('button');
             pauseButton.type = 'button';
@@ -125,14 +125,14 @@
 
             statsCard.add(timeElapsedRow);
             statsCard.add(resetCountRow);
-            statsCard.add(currentRewardRow);
+            statsCard.add(episodeRewardRow);
             statsCard.add(pauseButton);
 
             document.body.appendChild(statsCard.element);
 
             this.ui = {
                 card, select, button, status,
-                statsCard, timeElapsed: timeElapsedRow, resetCount: resetCountRow, currentReward: currentRewardRow, pauseButton
+                statsCard, timeElapsed: timeElapsedRow, resetCount: resetCountRow, episodeReward: episodeRewardRow, pauseButton
             };
             this.updateUIState();
         }
@@ -711,7 +711,7 @@
         }
 
         updateStatsDisplay() {
-            if (!this.ui.timeElapsed || !this.ui.resetCount || !this.ui.currentReward) {
+            if (!this.ui.timeElapsed || !this.ui.resetCount || !this.ui.episodeReward) {
                 return;
             }
 
@@ -730,8 +730,8 @@
             // Update reset count
             this.ui.resetCount.setValue(this.resetCount.toString());
 
-            // Update current reward
-            this.ui.currentReward.setValue(this.currentReward.toFixed(2));
+            // Update episode reward (running total for the current episode)
+            this.ui.episodeReward.setValue(this.totalReward.toFixed(2));
         }
 
         scheduleAutoReset() {
@@ -767,6 +767,9 @@
                 this.checkpointState.nextIndex = 0;
                 this.checkpointState.distanceNorm = 1;
                 this.checkpointState.progressWithinLap = 0;
+                this.currentReward = 0;
+                this.totalReward = 0;
+                this.updateStatsDisplay();
             }
         }
     }
