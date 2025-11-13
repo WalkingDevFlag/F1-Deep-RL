@@ -203,6 +203,9 @@ export function applyLoadingMixin(LevelEditor) {
         this.render();
         this.showEditor();
 
+        // Update checkpoints card with loaded data
+        this.updateCheckpointsCard();
+
         // Check for drafts
         this.checkForDraft();
     };
@@ -225,7 +228,81 @@ export function applyLoadingMixin(LevelEditor) {
         });
     };
 
+    LevelEditor.prototype.ensureEditorOverlayStyles = function ensureEditorOverlayStyles() {
+        if (document.getElementById('editor-overlay-style')) {
+            return;
+        }
+
+        const style = document.createElement('style');
+        style.id = 'editor-overlay-style';
+        style.textContent = `
+            .editor-overlay__label {
+                font-size: 24px;
+                font-weight: 700;
+                letter-spacing: 0.12em;
+                text-transform: uppercase;
+                text-align: center;
+                text-shadow: 0 0 12px rgba(0, 0, 0, 0.35);
+                padding: 0 24px;
+            }
+
+            .editor-shiny-text {
+                position: relative;
+                display: inline-block;
+                color: rgba(255, 255, 255, 0.25);
+                background: linear-gradient(
+                    120deg,
+                    rgba(255, 255, 255, 0) 35%,
+                    rgba(255, 255, 255, 0.95) 50%,
+                    rgba(255, 255, 255, 0) 65%
+                );
+                background-size: 220% 100%;
+                -webkit-background-clip: text;
+                background-clip: text;
+                animation: editor-overlay-shine var(--editor-shiny-duration, 3.5s) linear infinite;
+            }
+
+            .editor-shiny-text[data-disabled='true'] {
+                animation: none;
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .editor-shiny-text {
+                    animation-duration: 12s;
+                }
+            }
+
+            @keyframes editor-overlay-shine {
+                0% {
+                    background-position: 120% 0;
+                }
+                100% {
+                    background-position: -120% 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    };
+
+    LevelEditor.prototype.createOverlayLabel = function createOverlayLabel(text, options = {}) {
+        this.ensureEditorOverlayStyles();
+
+        const label = document.createElement('div');
+        label.className = 'editor-overlay__label editor-shiny-text';
+        if (options.duration) {
+            label.style.setProperty('--editor-shiny-duration', options.duration);
+        }
+        if (options.disabled) {
+            label.dataset.disabled = 'true';
+        }
+
+        label.textContent = text;
+        return label;
+    };
+
     LevelEditor.prototype.showLoadingOverlay = function showLoadingOverlay() {
+        this.ensureEditorOverlayStyles();
+
         let overlay = document.getElementById('loading-overlay');
         if (!overlay) {
             overlay = document.createElement('div');
@@ -236,17 +313,18 @@ export function applyLoadingMixin(LevelEditor) {
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background: rgba(0, 0, 0, 0.5);
+                background: rgba(0, 0, 0, 0.7);
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 z-index: 10000;
-                color: white;
-                font-size: 24px;
             `;
-            overlay.innerHTML = '<div>Loading track…</div>';
             document.body.appendChild(overlay);
         }
+
+        const label = this.createOverlayLabel('Loading track…', { duration: '3.6s' });
+        overlay.textContent = '';
+        overlay.appendChild(label);
         overlay.style.display = 'flex';
     };
 
@@ -275,5 +353,6 @@ export function applyLoadingMixin(LevelEditor) {
             }));
         }
         this.render();
+        this.updateCheckpointsCard();
     };
 }

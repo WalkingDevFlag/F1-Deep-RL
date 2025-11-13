@@ -20,11 +20,25 @@ export function applyInteractionMixin(LevelEditor) {
                     } else if (tool === 'wall') {
                         this.extractWalls();
                     } else if (tool === 'checkpoint') {
-                        this.activateCheckpointTool();
+                        // Toggle checkpoint tool
+                        if (this.currentTool === 'checkpoint') {
+                            this.deactivateTool('checkpoint');
+                            this.activateTool('select');
+                        } else {
+                            this.activateCheckpointTool();
+                        }
                     } else if (tool === 'save') {
                         this.saveGeometry();
                     } else {
-                        this.activateTool(tool);
+                        // Toggle tool activation for regular tools
+                        if (this.currentTool === tool) {
+                            // Tool is already active, deactivate it and go to select mode
+                            this.deactivateTool(tool);
+                            this.activateTool('select');
+                        } else {
+                            // Activate the new tool
+                            this.activateTool(tool);
+                        }
                     }
                 });
             });
@@ -40,13 +54,13 @@ export function applyInteractionMixin(LevelEditor) {
             } else if (e.key.toLowerCase() === 'p' && !e.ctrlKey && !e.metaKey) {
                 e.preventDefault();
                 this.togglePanMode();
-            } else if (e.key === ' ') {
+            } else if (e.key === ' ' && !this.isTitleEditing) {
                 e.preventDefault();
                 this.spaceHeld = true;
                 this.setInteractionMode('pan');
             } else if (e.key === 'Escape') {
                 this.cancelCurrentTool();
-            } else if (e.key === 'Delete' && this.editorState.selectedObject) {
+            } else if (e.key === 'Delete' && (this.editorState.selectedObject || this.editorState.selectedCheckpoints.length > 0)) {
                 this.deleteSelectedObject();
             } else if (e.key.toLowerCase() === 'f' && this.editorState.selectedObject === 'startLine') {
                 this.flipStartDirection();
@@ -56,11 +70,22 @@ export function applyInteractionMixin(LevelEditor) {
             } else if (e.ctrlKey && e.key === 'y') {
                 e.preventDefault();
                 this.redo();
+            } else if (e.ctrlKey && e.key === 'c') {
+                e.preventDefault();
+                this.copySelectedCheckpoints();
+            } else if (e.ctrlKey && e.key === 'v') {
+                e.preventDefault();
+                // Paste at current mouse position if available, otherwise center of view
+                const worldX = this.currentMouseWorldX !== undefined ? this.currentMouseWorldX :
+                    (this.canvas ? (this.canvas.width / 2 - this.panX) / this.zoom : 0);
+                const worldY = this.currentMouseWorldY !== undefined ? this.currentMouseWorldY :
+                    (this.canvas ? (this.canvas.height / 2 - this.panY) / this.zoom : 0);
+                this.pasteCheckpoints(worldX, worldY);
             }
         });
 
         document.addEventListener('keyup', (e) => {
-            if (e.key === ' ') {
+            if (e.key === ' ' && !this.isTitleEditing) {
                 this.spaceHeld = false;
                 this.restorePreviousMode();
             }
@@ -224,9 +249,7 @@ export function applyInteractionMixin(LevelEditor) {
                     
                     if (this.currentTool === 'delete') {
                         const toDelete = [...this.editorState.selectedCheckpoints];
-                        if (confirm(`Delete ${toDelete.length} checkpoint(s)?`)) {
-                            toDelete.forEach(id => this.deleteCheckpoint(id));
-                        }
+                        this.showCheckpointDeletionModal(toDelete);
                     }
                 }
                 this.render();
@@ -265,6 +288,10 @@ export function applyInteractionMixin(LevelEditor) {
     LevelEditor.prototype.handleMouseMove = function handleMouseMove(e) {
         const worldX = (e.offsetX - this.panX) / this.zoom;
         const worldY = (e.offsetY - this.panY) / this.zoom;
+
+        // Track current mouse position for paste operations
+        this.currentMouseWorldX = worldX;
+        this.currentMouseWorldY = worldY;
 
         if (this.currentInteractionMode === 'pan' && this.isDragging) {
             const deltaX = e.offsetX - this.lastMouseX;

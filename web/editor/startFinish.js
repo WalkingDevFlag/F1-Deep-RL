@@ -224,13 +224,8 @@ export function applyStartFinishMixin(LevelEditor) {
                 this.editorState.selectedObject = null;
             }
         } else if (this.editorState.selectedCheckpoints.length > 0) {
-            const count = this.editorState.selectedCheckpoints.length;
-            if (confirm(`Delete ${count} selected checkpoint${count > 1 ? 's' : ''}?`)) {
-                for (const id of [...this.editorState.selectedCheckpoints]) {
-                    this.deleteCheckpoint(id);
-                }
-                this.editorState.selectedCheckpoints = [];
-            }
+            const toDelete = [...this.editorState.selectedCheckpoints];
+            this.showCheckpointDeletionModal(toDelete);
         }
     };
 

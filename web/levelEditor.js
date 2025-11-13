@@ -62,6 +62,9 @@ class LevelEditor {
 		this.hasUnsavedChanges = false;
 		this.isOnline = navigator.onLine;
 		this.pendingSave = null;
+
+		this.isTitleEditing = false;
+		this._titleEditOriginalName = '';
 	}
 
 	initialize() {
@@ -214,6 +217,10 @@ class LevelEditor {
 	// showLoadingOverlay and hideLoadingOverlay are provided via applyLoadingMixin.
 
 	showWallExtractionOverlay() {
+		if (typeof this.ensureEditorOverlayStyles === 'function') {
+			this.ensureEditorOverlayStyles();
+		}
+
 		let overlay = document.getElementById('wall-extraction-overlay');
 		if (!overlay) {
 			overlay = document.createElement('div');
@@ -227,42 +234,29 @@ class LevelEditor {
 				display: flex;
 				align-items: center;
 				justify-content: center;
-				background: rgba(0, 0, 0, 0.4);
+				background: rgba(0, 0, 0, 0.7);
 				z-index: 10000;
-				color: #fff;
-				font-size: 20px;
 				flex-direction: column;
 			`;
-			const spinner = document.createElement('div');
-			spinner.style.cssText = `
-				width: 48px;
-				height: 48px;
-				border-radius: 50%;
-				border: 4px solid rgba(255, 255, 255, 0.3);
-				border-top-color: #fff;
-				animation: wall-extraction-spin 1s linear infinite;
-				margin-bottom: 12px;
-			`;
-			overlay.appendChild(spinner);
-			const label = document.createElement('div');
-			label.textContent = 'Extracting walls...';
-			overlay.appendChild(label);
-
-			// Inject keyframes only once
-			if (!document.getElementById('wall-extraction-style')) {
-				const style = document.createElement('style');
-				style.id = 'wall-extraction-style';
-				style.textContent = `
-					@keyframes wall-extraction-spin {
-						0% { transform: rotate(0deg); }
-						100% { transform: rotate(360deg); }
-					}
-				`;
-				document.head.appendChild(style);
-			}
-
 			document.body.appendChild(overlay);
 		}
+
+		const label = this.createOverlayLabel ?
+			this.createOverlayLabel('Extracting walls…', { duration: '3.2s' }) :
+			(() => {
+				const fallback = document.createElement('div');
+				fallback.textContent = 'Extracting walls…';
+				fallback.style.color = '#fff';
+				fallback.style.fontSize = '20px';
+				fallback.style.fontWeight = '700';
+				fallback.style.letterSpacing = '0.12em';
+				fallback.style.textTransform = 'uppercase';
+				fallback.style.textAlign = 'center';
+				return fallback;
+			})();
+
+		overlay.textContent = '';
+		overlay.appendChild(label);
 		overlay.style.display = 'flex';
 	}
 

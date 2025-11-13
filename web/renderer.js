@@ -12,6 +12,9 @@ class Renderer {
         this.showWalls = false;
         // Checkpoint rendering toggle (default OFF for performance)
         this.showCheckpoints = false;
+        // Start/Finish line rendering toggle (default OFF for performance)
+        this.showStartFinish = false;
+        this.wallPathCache = new WeakMap();
     }
 
     drawFrame(trackImg, car, carImg, camera, track = null) {
@@ -44,6 +47,11 @@ class Renderer {
             this.drawCheckpoints(track);
         }
         
+        // Draw start/finish line if enabled
+        if (this.showStartFinish && track) {
+            this.drawStartFinish(track);
+        }
+        
         // Draw car (which includes sensors)
         car.draw(this.ctx, carImg);
         
@@ -52,6 +60,35 @@ class Renderer {
         
         // Draw HUD info (outside camera transform)
         this.drawHUD(car, camera);
+    }
+
+    buildWallPath(path, walls) {
+        for (const wall of walls) {
+            if (wall.polyline && Array.isArray(wall.polyline) && wall.polyline.length >= 2) {
+                path.moveTo(wall.polyline[0][0], wall.polyline[0][1]);
+
+                for (let i = 1; i < wall.polyline.length; i++) {
+                    path.lineTo(wall.polyline[i][0], wall.polyline[i][1]);
+                }
+            }
+        }
+
+        return path;
+    }
+
+    getCachedWallPath(track, walls) {
+        if (typeof Path2D !== 'function') {
+            return null;
+        }
+
+        const cached = this.wallPathCache.get(track);
+        if (cached && cached.walls === walls) {
+            return cached.path;
+        }
+
+        const path = this.buildWallPath(new Path2D(), walls);
+        this.wallPathCache.set(track, { walls, path });
+        return path;
     }
 
     drawWalls(track) {
@@ -64,21 +101,17 @@ class Renderer {
         this.ctx.lineCap = 'round';
         this.ctx.lineJoin = 'round';
 
-        // Batch all walls into a single path for better performance
-        this.ctx.beginPath();
-        
-        for (const wall of walls) {
-            if (wall.polyline && Array.isArray(wall.polyline) && wall.polyline.length >= 2) {
-                this.ctx.moveTo(wall.polyline[0][0], wall.polyline[0][1]);
-                
-                for (let i = 1; i < wall.polyline.length; i++) {
-                    this.ctx.lineTo(wall.polyline[i][0], wall.polyline[i][1]);
-                }
-            }
+        const cachedPath = this.getCachedWallPath(track, walls);
+
+        if (cachedPath) {
+            this.ctx.stroke(cachedPath);
+        } else {
+            // Fallback for environments without Path2D support
+            this.ctx.beginPath();
+            this.buildWallPath(this.ctx, walls);
+            this.ctx.stroke();
         }
-        
-        // Single stroke call for all walls
-        this.ctx.stroke();
+
         this.ctx.restore();
     }
 
@@ -112,6 +145,32 @@ class Renderer {
         this.ctx.restore();
     }
 
+    drawStartFinish(track) {
+        const startLine = track.getStartLine();
+        if (!startLine) return;
+
+        this.ctx.save();
+        this.ctx.strokeStyle = 'rgba(255, 165, 0, 0.8)'; // Semi-transparent orange
+        this.ctx.lineWidth = 3;
+        this.ctx.lineCap = 'round';
+
+        // Draw the start/finish line
+        this.ctx.beginPath();
+        this.ctx.moveTo(startLine.x1, startLine.y1);
+        this.ctx.lineTo(startLine.x2, startLine.y2);
+        this.ctx.stroke();
+
+        // Draw a small label
+        const midX = (startLine.x1 + startLine.x2) / 2;
+        const midY = (startLine.y1 + startLine.y2) / 2;
+        this.ctx.fillStyle = 'rgba(255, 165, 0, 0.9)';
+        this.ctx.font = '12px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('S/F', midX, midY - 8);
+
+        this.ctx.restore();
+    }
+
     setShowWalls(show) {
         this.showWalls = Boolean(show);
     }
@@ -120,7 +179,15 @@ class Renderer {
         this.showCheckpoints = Boolean(show);
     }
 
+    setShowStartFinish(show) {
+        this.showStartFinish = Boolean(show);
+    }
+
     drawHUD(car, camera) {
         // HUD is handled by the DOM overlay in index.html.
     }
+}
+
+if (typeof window !== 'undefined') {
+    window.Renderer = Renderer;
 }

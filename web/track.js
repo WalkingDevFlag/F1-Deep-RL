@@ -13,19 +13,72 @@ class Track {
         this.walls = [];
         this.startLine = null;
         this.geometryLoaded = false;
+        this._alphaMask = null;
+    }
+
+    invalidateAlphaMask() {
+        this._alphaMask = null;
+    }
+
+    ensureAlphaMask() {
+        if (!this.offscreenCtx || !this.trackImg) {
+            return null;
+        }
+
+        const width = this.trackImg.width;
+        const height = this.trackImg.height;
+
+        if (this._alphaMask && this._alphaMask.width === width && this._alphaMask.height === height) {
+            return this._alphaMask;
+        }
+
+        const imageData = this.offscreenCtx.getImageData(0, 0, width, height);
+        const alpha = new Uint8Array(width * height);
+        const source = imageData.data;
+
+        for (let i = 0, j = 3; i < alpha.length; i += 1, j += 4) {
+            alpha[i] = source[j];
+        }
+
+        this._alphaMask = { data: alpha, width, height };
+        return this._alphaMask;
+    }
+
+    isPixelOnTrack(px, py) {
+        const mask = this.ensureAlphaMask();
+        if (!mask) {
+            return false;
+        }
+
+        const { data, width, height } = mask;
+        const x = Math.floor(px);
+        const y = Math.floor(py);
+
+        if (x < 0 || x >= width || y < 0 || y >= height) {
+            return false;
+        }
+
+        const idx = y * width + x;
+        return data[idx] > 0;
     }
 
     extractBorders() {
         // Extract track borders from the image
-        const imageData = this.offscreenCtx.getImageData(0, 0, this.trackImg.width, this.trackImg.height);
+        const mask = this.ensureAlphaMask();
+        if (!mask) {
+            console.warn('extractBorders: alpha mask unavailable');
+            return [];
+        }
+
         const borders = [];
         const step = 5; // Sample every 5 pixels for performance
+        const { data, width, height } = mask;
         
         // Scan the image and find border pixels (transition from track to non-track)
-        for (let y = 0; y < this.trackImg.height; y += step) {
-            for (let x = 0; x < this.trackImg.width; x += step) {
-                const idx = (y * this.trackImg.width + x) * 4;
-                const isOnTrack = imageData.data[idx + 3] > 0;
+        for (let y = 0; y < height; y += step) {
+            for (let x = 0; x < width; x += step) {
+                const idx = y * width + x;
+                const isOnTrack = data[idx] > 0;
                 
                 if (isOnTrack) {
                     // Check neighbors to see if we're at a border
@@ -39,9 +92,9 @@ class Track {
                     for (const { dx, dy } of neighbors) {
                         const nx = x + dx;
                         const ny = y + dy;
-                        if (nx >= 0 && nx < this.trackImg.width && ny >= 0 && ny < this.trackImg.height) {
-                            const nIdx = (ny * this.trackImg.width + nx) * 4;
-                            const neighborOnTrack = imageData.data[nIdx + 3] > 0;
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                            const nIdx = ny * width + nx;
+                            const neighborOnTrack = data[nIdx] > 0;
                             
                             if (!neighborOnTrack) {
                                 // This is a border pixel - create a small line segment
@@ -62,9 +115,28 @@ class Track {
     }
 
     findSafeSpawnPoint() {
-        const imageData = this.offscreenCtx.getImageData(0, 0, this.trackImg.width, this.trackImg.height);
-        const centerX = Math.floor(this.trackImg.width / 2);
-        const centerY = Math.floor(this.trackImg.height / 2);
+        const mask = this.ensureAlphaMask();
+        if (!mask) {
+            console.warn('findSafeSpawnPoint: alpha mask unavailable, using center fallback');
+            return {
+                x: Math.floor(this.trackImg.width / 2),
+                y: Math.floor(this.trackImg.height / 2),
+                angle: 0
+            };
+        }
+
+        const { data, width, height } = mask;
+        const centerX = Math.floor(width / 2);
+        const centerY = Math.floor(height / 2);
+
+        const isOpaque = (px, py) => {
+            if (px < 0 || px >= width || py < 0 || py >= height) {
+                return false;
+            }
+
+            const idx = py * width + px;
+            return data[idx] > 0;
+        };
         
         // Helper to check if entire car fits at position with given angle
         const isCarSafe = (testX, testY, testAngle = 0) => {
@@ -93,13 +165,7 @@ class Track {
                         const py = Math.floor(rotatedY + by);
                         
                         // Out of bounds check
-                        if (px < 0 || px >= this.trackImg.width || py < 0 || py >= this.trackImg.height) {
-                            return false;
-                        }
-                        
-                        const idx = (py * this.trackImg.width + px) * 4;
-                        // Off track (transparent area)
-                        if (imageData.data[idx + 3] === 0) {
+                        if (!isOpaque(px, py)) {
                             return false;
                         }
                     }
@@ -122,12 +188,7 @@ class Track {
                     const px = Math.floor(rotatedX);
                     const py = Math.floor(rotatedY);
                     
-                    if (px < 0 || px >= this.trackImg.width || py < 0 || py >= this.trackImg.height) {
-                        return false;
-                    }
-                    
-                    const idx = (py * this.trackImg.width + px) * 4;
-                    if (imageData.data[idx + 3] === 0) {
+                    if (!isOpaque(px, py)) {
                         return false;
                     }
                 }
@@ -146,7 +207,7 @@ class Track {
         }
         
         // Search in expanding circles
-        for (let radius = 50; radius < Math.max(this.trackImg.width, this.trackImg.height) / 2; radius += 30) {
+        for (let radius = 50; radius < Math.max(width, height) / 2; radius += 30) {
             for (let angle = 0; angle < Math.PI * 2; angle += 0.3) {
                 const testX = Math.floor(centerX + Math.cos(angle) * radius);
                 const testY = Math.floor(centerY + Math.sin(angle) * radius);
@@ -162,8 +223,8 @@ class Track {
         
         // Fallback: scan entire track
         console.warn('Spawn: Scanning entire track for safe position...');
-        for (let y = 100; y < this.trackImg.height - 100; y += 40) {
-            for (let x = 100; x < this.trackImg.width - 100; x += 40) {
+        for (let y = 100; y < height - 100; y += 40) {
+            for (let x = 100; x < width - 100; x += 40) {
                 for (const testAngle of testAngles) {
                     if (isCarSafe(x, y, testAngle)) {
                         console.log('Spawn: Found safe position at', x, y, 'angle', testAngle, '(fallback scan)');
@@ -295,4 +356,8 @@ class Track {
     isGeometryLoaded() {
         return this.geometryLoaded;
     }
+}
+
+if (typeof window !== 'undefined') {
+    window.Track = Track;
 }

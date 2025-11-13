@@ -1,4 +1,5 @@
 from flask import Flask, send_from_directory, request, jsonify
+import logging
 import os
 import time
 import webbrowser
@@ -7,8 +8,145 @@ import json
 import re
 import shutil
 from datetime import datetime
+from typing import Any, Dict, Optional
+
+import numpy as np
+
+from training import DQNTrainer, TrainingConfig, available_agents
 
 app = Flask(__name__)
+
+logging.basicConfig(level=os.environ.get("TRAINER_LOG_LEVEL", "INFO"))
+logger = logging.getLogger(__name__)
+
+
+class TrainerService:
+    """Manages the in-process RL trainer lifecycle and HTTP bridge."""
+
+    def __init__(self, config: TrainingConfig) -> None:
+        self._config = config
+        self._trainer = DQNTrainer(config)
+        self._lock = threading.Lock()
+        self._agent_name: Optional[str] = None
+        self._last_metrics: Dict[str, float] = {}
+
+    def start(self, agent_name: str) -> Dict[str, Any]:
+        agents = available_agents()
+        if agent_name not in agents:
+            raise ValueError(f"Unknown agent '{agent_name}'")
+        with self._lock:
+            self._agent_name = agent_name
+            self._trainer.start()
+            logger.info("Training started with agent %s", agent_name)
+            return self.status()
+
+    def stop(self) -> Dict[str, Any]:
+        with self._lock:
+            self._trainer.stop()
+            logger.info("Training stopped")
+            self._agent_name = None
+            self._last_metrics = {}
+            return self.status()
+
+    def status(self) -> Dict[str, Any]:
+        status = self._trainer.get_status()
+        status.update(
+            {
+                "agent": self._agent_name,
+                "state_size": self._config.state_size,
+                "action_size": self._config.action_size,
+                "last_metrics": self._last_metrics,
+            }
+        )
+        # Ensure JSON serialisable primitives
+        status["buffer_size"] = int(status.get("buffer_size", 0))
+        status["total_steps"] = int(status.get("total_steps", 0))
+        status["training_steps"] = int(status.get("training_steps", 0))
+        status["current_episode_length"] = int(status.get("current_episode_length", 0))
+        status["running"] = bool(status.get("running", False))
+        return status
+
+    def step(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        with self._lock:
+            state = self._ensure_state_vector(payload.get("state"))
+            include_snapshot = bool(payload.get("include_snapshot", False))
+            network_snapshot: Optional[Dict[str, Any]] = None
+            if include_snapshot:
+                try:
+                    network_snapshot = self._trainer.inspect_network(state)
+                except Exception as exc:  # pragma: no cover - diagnostics only
+                    logger.debug("Failed to build network snapshot: %s", exc)
+
+            if not self._trainer.running:
+                response = self.status()
+                response["action"] = self._trainer.default_action()
+                response["running"] = False
+                if network_snapshot is not None:
+                    response["network_snapshot"] = network_snapshot
+                return response
+
+            prev_state_raw = payload.get("prev_state")
+            prev_state = (
+                self._ensure_state_vector(prev_state_raw)
+                if prev_state_raw is not None
+                else None
+            )
+            prev_action = payload.get("prev_action")
+            if prev_action is not None:
+                prev_action = int(prev_action)
+
+            reward = float(payload.get("reward", 0.0))
+            done = bool(payload.get("done", False))
+            reset = bool(payload.get("reset", False))
+
+            metrics: Dict[str, float] = {}
+            if prev_state is not None and prev_action is not None:
+                metrics = self._trainer.record_transition(prev_state, prev_action, reward, state, done)
+                self._last_metrics = metrics
+            elif prev_state is None:
+                self._last_metrics = self._last_metrics or {}
+
+            if reset:
+                self._trainer.reset_episode()
+
+            action = self._trainer.default_action() if done else self._trainer.select_action(state)
+
+            response = self.status()
+            response.update(
+                {
+                    "action": int(action),
+                    "running": self._trainer.running,
+                    "metrics": metrics,
+                }
+            )
+            if network_snapshot is not None:
+                response["network_snapshot"] = network_snapshot
+            return response
+
+    def _ensure_state_vector(self, value: Any) -> np.ndarray:
+        array = np.asarray(value, dtype=np.float32)
+        expected_shape = (self._config.state_size,)
+        if array.shape != expected_shape:
+            raise ValueError(
+                f"Expected state vector of shape {expected_shape}, received {array.shape}"
+            )
+        return array
+
+
+TRAINING_CONFIG = TrainingConfig(
+    state_size=19,
+    action_size=7,
+    replay_buffer_size=100_000,
+    batch_size=64,
+    gamma=0.99,
+    learning_rate=1e-4,
+    train_frequency=4,
+    target_update_frequency=1_000,
+    save_every_steps=5_000,
+    max_training_steps=1_000_000,
+)
+
+trainer_service = TrainerService(TRAINING_CONFIG)
 
 
 def slugify(text):
@@ -301,6 +439,69 @@ def get_geometry_versions(track_id):
         return jsonify(versions)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/training/agents', methods=['GET'])
+def training_agents():
+    try:
+        data = {
+            'agents': available_agents(),
+            'config': {
+                'state_size': TRAINING_CONFIG.state_size,
+                'action_size': TRAINING_CONFIG.action_size,
+            },
+            'status': trainer_service.status(),
+        }
+        return jsonify(data)
+    except Exception as exc:
+        logger.exception('Failed to list training agents: %s', exc)
+        return jsonify({'error': 'Unable to retrieve agents'}), 500
+
+
+@app.route('/training/start', methods=['POST'])
+def start_training():
+    payload = request.get_json(silent=True) or {}
+    agent = payload.get('agent', 'DQN')
+    try:
+        status = trainer_service.start(agent)
+        return jsonify(status)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.exception('Failed to start training: %s', exc)
+        return jsonify({'error': 'Failed to start training'}), 500
+
+
+@app.route('/training/stop', methods=['POST'])
+def stop_training():
+    try:
+        status = trainer_service.stop()
+        return jsonify(status)
+    except Exception as exc:
+        logger.exception('Failed to stop training: %s', exc)
+        return jsonify({'error': 'Failed to stop training'}), 500
+
+
+@app.route('/training/status', methods=['GET'])
+def training_status():
+    try:
+        return jsonify(trainer_service.status())
+    except Exception as exc:
+        logger.exception('Failed to fetch training status: %s', exc)
+        return jsonify({'error': 'Failed to fetch status'}), 500
+
+
+@app.route('/training/step', methods=['POST'])
+def training_step():
+    payload = request.get_json(silent=True) or {}
+    try:
+        result = trainer_service.step(payload)
+        return jsonify(result)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.exception('Training step failed: %s', exc)
+        return jsonify({'error': 'Training step failed'}), 500
 
 
 def validate_geometry(geometry, track_id):

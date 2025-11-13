@@ -43,7 +43,8 @@ export function applyPersistenceMixin(LevelEditor) {
             meta: {
                 author,
                 notes,
-                source
+                source,
+                name: this.currentMeta?.name || 'Unknown Track'
             }
         };
 
@@ -142,7 +143,16 @@ export function applyPersistenceMixin(LevelEditor) {
         const saveButton = this.dock ? this.dock.querySelector('[data-tool="save"]') : null;
         if (saveButton) {
             saveButton.disabled = saving;
-            saveButton.textContent = saving ? 'Saving...' : 'Save';
+
+            const label = saveButton.querySelector('.ui-dock__label');
+            if (label) {
+                label.textContent = saving ? 'Saving...' : 'Save';
+            }
+
+            const tooltip = saveButton.querySelector('.ui-dock__tooltip');
+            if (tooltip) {
+                tooltip.textContent = saving ? 'Saving...' : 'Save';
+            }
         }
 
         // Disable other tools during save
@@ -160,6 +170,10 @@ export function applyPersistenceMixin(LevelEditor) {
     };
 
     LevelEditor.prototype.showSavingOverlay = function showSavingOverlay() {
+        if (typeof this.ensureEditorOverlayStyles === 'function') {
+            this.ensureEditorOverlayStyles();
+        }
+
         let overlay = document.getElementById('saving-overlay');
         if (!overlay) {
             overlay = document.createElement('div');
@@ -170,17 +184,24 @@ export function applyPersistenceMixin(LevelEditor) {
                 left: 0;
                 width: 100%;
                 height: 100%;
-                background: rgba(0, 0, 0, 0.5);
+                background: rgba(0, 0, 0, 0.7);
                 display: flex;
                 align-items: center;
                 justify-content: center;
                 z-index: 10000;
-                color: white;
-                font-size: 24px;
             `;
-            overlay.innerHTML = '<div>Saving...</div>';
             document.body.appendChild(overlay);
         }
+
+        const label = this.createOverlayLabel ?
+            this.createOverlayLabel('Saving…', { duration: '3.8s' }) :
+            (() => {
+                const fallback = document.createElement('div');
+                fallback.textContent = 'Saving…';
+                return fallback;
+            })();
+        overlay.textContent = '';
+        overlay.appendChild(label);
         overlay.style.display = 'flex';
     };
 

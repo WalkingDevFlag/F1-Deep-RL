@@ -90,3 +90,7 @@ class AssetLoader {
         return this.trackMeta;
     }
 }
+
+if (typeof window !== 'undefined') {
+    window.AssetLoader = AssetLoader;
+}

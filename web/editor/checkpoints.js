@@ -45,6 +45,9 @@ export function applyCheckpointsMixin(LevelEditor) {
         }
     };
 
+    // Initialize clipboard for checkpoints
+    LevelEditor.prototype.checkpointClipboard = null;
+
     LevelEditor.prototype.activateCheckpointTool = function activateCheckpointTool() {
         this.activateTool('checkpoint');
     };
@@ -92,6 +95,7 @@ export function applyCheckpointsMixin(LevelEditor) {
         this.markUnsavedChanges();
         this.showToast(`Checkpoint ${checkpoint.id} created`, 'success');
         this.render();
+        this.updateCheckpointsCard();
         return checkpoint;
     };
 
@@ -120,6 +124,7 @@ export function applyCheckpointsMixin(LevelEditor) {
 
         this.markUnsavedChanges();
         this.render();
+        this.updateCheckpointsCard();
     };
 
     LevelEditor.prototype.resizeCheckpoint = function resizeCheckpoint(id, handleId, newX, newY) {
@@ -205,35 +210,152 @@ export function applyCheckpointsMixin(LevelEditor) {
         this.render();
     };
 
-    LevelEditor.prototype.deleteCheckpoint = function deleteCheckpoint(id) {
-        const index = this.editorState.checkpoints.findIndex(cp => cp.id === id);
-        if (index === -1) return;
+    LevelEditor.prototype.showCheckpointDeletionModal = function showCheckpointDeletionModal(checkpointIds) {
+        this.ensureEditorOverlayStyles();
 
-        const checkpoint = this.editorState.checkpoints[index];
-        const prevCheckpoints = [...this.editorState.checkpoints];
-        this.editorState.checkpoints.splice(index, 1);
-
-        // Remove from selection
-        const selIndex = this.editorState.selectedCheckpoints.indexOf(id);
-        if (selIndex > -1) {
-            this.editorState.selectedCheckpoints.splice(selIndex, 1);
+        let modal = document.getElementById('checkpoint-deletion-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'checkpoint-deletion-modal';
+            modal.className = 'editor-modal';
+            modal.setAttribute('role', 'dialog');
+            modal.setAttribute('aria-modal', 'true');
+            modal.setAttribute('aria-labelledby', 'checkpoint-deletion-title');
+            modal.setAttribute('aria-describedby', 'checkpoint-deletion-description');
+            modal.setAttribute('aria-hidden', 'true');
+            modal.setAttribute('hidden', '');
+            document.body.appendChild(modal);
         }
 
-        this.pushAction({
-            do: () => {
-                this.editorState.checkpoints = prevCheckpoints.filter(cp => cp.id !== id);
-                this.render();
-            },
-            undo: () => {
-                this.editorState.checkpoints = prevCheckpoints;
-                this.render();
-            },
-            description: `Delete checkpoint ${id}`
-        });
+        const count = checkpointIds.length;
+        const message = count === 1
+            ? `Are you sure you want to <strong>delete</strong> this checkpoint?`
+            : `Are you sure you want to <strong>delete</strong> ${count} checkpoints?`;
 
-        this.markUnsavedChanges();
-        this.showToast(`Checkpoint ${id} deleted`, 'info');
-        this.render();
+        const content = document.createElement('section');
+        content.className = 'ui-card editor-modal__content';
+        content.setAttribute('role', 'document');
+        content.setAttribute('tabindex', '-1');
+
+        const closeButton = document.createElement('button');
+        closeButton.type = 'button';
+        closeButton.className = 'editor-modal__close';
+        closeButton.setAttribute('aria-label', 'Close deletion confirmation');
+        closeButton.innerHTML = '&times;';
+        closeButton.onclick = () => {
+            this.hideCheckpointDeletionModal();
+        };
+
+        const title = document.createElement('h2');
+        title.className = 'ui-card__title';
+        title.id = 'checkpoint-deletion-title';
+        title.textContent = 'Confirm Deletion';
+
+        const body = document.createElement('div');
+        body.className = 'ui-card__body';
+
+        const lead = document.createElement('p');
+        lead.className = 'editor-modal__lead';
+        lead.id = 'checkpoint-deletion-description';
+        lead.innerHTML = message;
+
+        const actions = document.createElement('div');
+        actions.className = 'editor-modal__actions';
+
+        const confirmButton = document.createElement('button');
+        confirmButton.type = 'button';
+        confirmButton.className = 'editor-modal__action';
+        confirmButton.textContent = 'Confirm';
+        confirmButton.onclick = () => {
+            this.hideCheckpointDeletionModal();
+            this.confirmDeleteCheckpoints(checkpointIds);
+        };
+
+        const cancelButton = document.createElement('button');
+        cancelButton.type = 'button';
+        cancelButton.className = 'editor-modal__action editor-modal__action--secondary';
+        cancelButton.textContent = 'Cancel';
+        cancelButton.onclick = () => {
+            this.hideCheckpointDeletionModal();
+        };
+
+        actions.appendChild(confirmButton);
+        actions.appendChild(cancelButton);
+
+        body.appendChild(lead);
+        body.appendChild(actions);
+
+        content.appendChild(closeButton);
+        content.appendChild(title);
+        content.appendChild(body);
+
+        modal.textContent = '';
+        modal.appendChild(content);
+        modal.classList.add('is-open');
+        modal.removeAttribute('hidden');
+        modal.setAttribute('aria-hidden', 'false');
+    };
+
+    LevelEditor.prototype.hideCheckpointDeletionModal = function hideCheckpointDeletionModal() {
+        const modal = document.getElementById('checkpoint-deletion-modal');
+        if (modal) {
+            modal.classList.remove('is-open');
+            modal.setAttribute('aria-hidden', 'true');
+            modal.setAttribute('hidden', '');
+        }
+    };
+
+    LevelEditor.prototype.confirmDeleteCheckpoints = function confirmDeleteCheckpoints(checkpointIds) {
+        const prevCheckpoints = [...this.editorState.checkpoints];
+        const deletedCheckpoints = [];
+
+        for (const id of checkpointIds) {
+            const index = this.editorState.checkpoints.findIndex(cp => cp.id === id);
+            if (index !== -1) {
+                const checkpoint = this.editorState.checkpoints.splice(index, 1)[0];
+                deletedCheckpoints.push(checkpoint);
+
+                // Remove from selection
+                const selIndex = this.editorState.selectedCheckpoints.indexOf(id);
+                if (selIndex > -1) {
+                    this.editorState.selectedCheckpoints.splice(selIndex, 1);
+                }
+            }
+        }
+
+        if (deletedCheckpoints.length > 0) {
+            this.pushAction({
+                do: () => {
+                    this.editorState.checkpoints = prevCheckpoints.filter(cp => !checkpointIds.includes(cp.id));
+                    this.editorState.selectedCheckpoints = this.editorState.selectedCheckpoints.filter(id => !checkpointIds.includes(id));
+                    this.render();
+                    this.updateCheckpointsCard();
+                },
+                undo: () => {
+                    this.editorState.checkpoints = prevCheckpoints;
+                    this.render();
+                    this.updateCheckpointsCard();
+                },
+                description: `Delete ${deletedCheckpoints.length} checkpoint(s)`
+            });
+
+            this.markUnsavedChanges();
+            this.showToast(`${deletedCheckpoints.length} checkpoint(s) deleted`, 'info');
+            this.render();
+            this.updateCheckpointsCard();
+        }
+    };
+
+    LevelEditor.prototype.deleteCheckpoint = function deleteCheckpoint(id) {
+        this.showCheckpointDeletionModal([id]);
+    };
+
+    LevelEditor.prototype.deleteSelectedCheckpoints = function deleteSelectedCheckpoints() {
+        if (this.editorState.selectedCheckpoints.length === 0) {
+            this.showToast('No checkpoints selected to delete', 'info');
+            return;
+        }
+        this.showCheckpointDeletionModal([...this.editorState.selectedCheckpoints]);
     };
 
     LevelEditor.prototype.hitTestCheckpoint = function hitTestCheckpoint(worldX, worldY) {
@@ -526,10 +648,12 @@ export function applyCheckpointsMixin(LevelEditor) {
                     do: () => {
                         Object.assign(checkpoint, finalState);
                         this.render();
+                        this.updateCheckpointsCard();
                     },
                     undo: () => {
                         Object.assign(checkpoint, initial);
                         this.render();
+                        this.updateCheckpointsCard();
                     },
                     description: `${handleLabel} checkpoint ${checkpoint.id}`
                 });

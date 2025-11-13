@@ -7,6 +7,23 @@ export function applyHudMixin(LevelEditor) {
         const titleEl = document.createElement('span');
         titleEl.className = 'editor-header__title ui-card__title';
         titleEl.textContent = 'Level Editor';
+    titleEl.tabIndex = 0;
+
+        titleEl.addEventListener('click', () => {
+            this.startTitleEditing();
+        });
+
+        titleEl.addEventListener('keydown', (event) => {
+            this.handleTitleKeydown(event);
+        });
+
+        titleEl.addEventListener('blur', () => {
+            this.handleTitleBlur();
+        }, true);
+
+        titleEl.addEventListener('paste', (event) => {
+            this.handleTitlePaste(event);
+        });
 
         const exitButton = document.createElement('button');
         exitButton.type = 'button';
@@ -76,6 +93,9 @@ export function applyHudMixin(LevelEditor) {
     this.hudCardContainer.appendChild(hudCard.element);
 
     this.trackNameEl = trackNameRow;
+
+    // Create Checkpoints Card
+    this.createCheckpointsCard();
     };
 
     LevelEditor.prototype.updateTrackLabel = function updateTrackLabel(baseName) {
@@ -85,8 +105,940 @@ export function applyHudMixin(LevelEditor) {
         }
 
     if (this.headerTitleEl) {
-        const headerSuffix = this.editorState.startLine ? ' (start ready)' : '';
-        this.headerTitleEl.textContent = `${baseName}${headerSuffix}`;
+        this.headerTitleEl.textContent = baseName;
     }
     };
+
+    LevelEditor.prototype.startTitleEditing = function startTitleEditing() {
+        if (this.isTitleEditing || !this.headerTitleEl) {
+            return;
+        }
+
+        if (!this.currentMeta) {
+            this.currentMeta = {};
+        }
+
+        const currentName = this.currentMeta.name || this.headerTitleEl.textContent || 'Untitled Track';
+
+        this.isTitleEditing = true;
+        this._titleEditOriginalName = currentName;
+
+        this.headerTitleEl.setAttribute('contenteditable', 'true');
+        this.headerTitleEl.setAttribute('role', 'textbox');
+        this.headerTitleEl.setAttribute('aria-label', 'Track name (editing)');
+        this.headerTitleEl.setAttribute('spellcheck', 'false');
+        this.headerTitleEl.style.outline = 'none';
+        this.headerTitleEl.style.caretColor = 'inherit';
+        this.headerTitleEl.textContent = currentName;
+
+        const selection = window.getSelection();
+        if (selection) {
+            const range = document.createRange();
+            range.selectNodeContents(this.headerTitleEl);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+
+        this.headerTitleEl.focus();
+    };
+
+    LevelEditor.prototype.handleTitleKeydown = function handleTitleKeydown(event) {
+        if (!this.headerTitleEl) return;
+
+        if (!this.isTitleEditing) {
+            if (event.key === 'Enter' || event.key === 'F2') {
+                event.preventDefault();
+                this.startTitleEditing();
+            }
+            return;
+        }
+
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            this.finishTitleEditing(true);
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            this.finishTitleEditing(false);
+        }
+    };
+
+    LevelEditor.prototype.handleTitleBlur = function handleTitleBlur() {
+        if (this.isTitleEditing) {
+            this.finishTitleEditing(true);
+        }
+    };
+
+    LevelEditor.prototype.handleTitlePaste = function handleTitlePaste(event) {
+        if (!this.isTitleEditing) {
+            return;
+        }
+
+        event.preventDefault();
+        const clipboardData = event.clipboardData || window.clipboardData;
+        if (!clipboardData) {
+            return;
+        }
+
+        const text = clipboardData.getData('text/plain');
+        const sanitized = this.sanitizeTrackName(text);
+
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) {
+            return;
+        }
+
+        selection.deleteFromDocument();
+        selection.getRangeAt(0).insertNode(document.createTextNode(sanitized));
+        selection.collapseToEnd();
+    };
+
+    LevelEditor.prototype.finishTitleEditing = function finishTitleEditing(confirmChange) {
+        if (!this.isTitleEditing || !this.headerTitleEl) {
+            return;
+        }
+
+        const titleEl = this.headerTitleEl;
+        let finalName = this._titleEditOriginalName || '';
+
+        if (confirmChange) {
+            const newName = this.sanitizeTrackName(titleEl.textContent);
+            if (newName) {
+                finalName = newName;
+            }
+        }
+
+        this.isTitleEditing = false;
+        this._titleEditOriginalName = '';
+
+        titleEl.removeAttribute('contenteditable');
+        titleEl.removeAttribute('role');
+        titleEl.removeAttribute('aria-label');
+        titleEl.removeAttribute('spellcheck');
+        titleEl.style.outline = '';
+
+        if (confirmChange) {
+            if (!this.currentMeta) {
+                this.currentMeta = {};
+            }
+            if (finalName && this.currentMeta.name !== finalName) {
+                this.currentMeta.name = finalName;
+                this.markUnsavedChanges();
+            }
+        }
+
+        this.updateTrackLabel(this.currentMeta?.name || finalName || 'Unknown Track');
+    };
+
+    LevelEditor.prototype.sanitizeTrackName = function sanitizeTrackName(raw) {
+        if (!raw) {
+            return '';
+        }
+        return raw.replace(/[\t\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
+    };
+
+    LevelEditor.prototype.createCheckpointsCard = function createCheckpointsCard() {
+        if (!window.UIKit || !this.container) {
+            return;
+        }
+
+        const { createCard } = window.UIKit;
+
+        const styleId = 'checkpoints-card-style';
+        if (!document.getElementById(styleId)) {
+            const styleEl = document.createElement('style');
+            styleEl.id = styleId;
+            styleEl.textContent = `
+                .checkpoints-list {
+                    scrollbar-width: none;
+                    -ms-overflow-style: none;
+                }
+
+                .checkpoints-list::-webkit-scrollbar {
+                    display: none;
+                }
+
+                .checkpoint-button {
+                    will-change: transform;
+                }
+
+                .checkpoint-button--animate-up {
+                    animation: checkpointMoveUp 400ms cubic-bezier(0.34, 1.56, 0.64, 1), checkpointGlow 600ms ease-out;
+                }
+
+                .checkpoint-button--animate-down {
+                    animation: checkpointMoveDown 400ms cubic-bezier(0.34, 1.56, 0.64, 1), checkpointGlow 600ms ease-out;
+                }
+
+                .checkpoint-button--drag-over {
+                    outline: 2px dashed var(--hud-accent);
+                    outline-offset: 4px;
+                }
+
+                .checkpoint-button--dragging {
+                    opacity: 0.85;
+                }
+
+                .checkpoint-button[data-drag-state='idle'] .checkpoint-dots-menu,
+                .checkpoint-dots-menu {
+                    cursor: grab;
+                }
+
+                .checkpoint-button[data-drag-state='dragging'] .checkpoint-dots-menu {
+                    cursor: grabbing;
+                }
+
+                .checkpoint-dots-menu {
+                    touch-action: none;
+                }
+
+                @keyframes checkpointMoveUp {
+                    0% {
+                        transform: translateY(0);
+                    }
+                    20% {
+                        transform: translateY(18px);
+                    }
+                    40% {
+                        transform: translateY(-8px);
+                    }
+                    60% {
+                        transform: translateY(12px);
+                    }
+                    80% {
+                        transform: translateY(-4px);
+                    }
+                    100% {
+                        transform: translateY(0);
+                    }
+                }
+
+                @keyframes checkpointMoveDown {
+                    0% {
+                        transform: translateY(0);
+                    }
+                    20% {
+                        transform: translateY(-18px);
+                    }
+                    40% {
+                        transform: translateY(8px);
+                    }
+                    60% {
+                        transform: translateY(-12px);
+                    }
+                    80% {
+                        transform: translateY(4px);
+                    }
+                    100% {
+                        transform: translateY(0);
+                    }
+                }
+
+                @keyframes checkpointGlow {
+                    0% {
+                        box-shadow: var(--hud-shadow);
+                    }
+                    20% {
+                        box-shadow: 0 0 0 0 rgba(45, 140, 240, 0.6), var(--hud-shadow);
+                    }
+                    50% {
+                        box-shadow: 0 0 0 8px rgba(45, 140, 240, 0), var(--hud-shadow);
+                    }
+                    100% {
+                        box-shadow: var(--hud-shadow);
+                    }
+                }
+            `;
+            document.head.appendChild(styleEl);
+        }
+
+        // Create checkpoints card
+        const checkpointsCard = createCard({ title: 'Checkpoints' });
+        checkpointsCard.element.classList.add('ui-card--bottom-right');
+        checkpointsCard.element.setAttribute('aria-label', 'Checkpoints Manager');
+
+        // Create checkpoints list container
+        const checkpointsList = document.createElement('div');
+        checkpointsList.className = 'checkpoints-list';
+        checkpointsList.style.display = 'flex';
+        checkpointsList.style.flexDirection = 'column';
+        checkpointsList.style.gap = '8px';
+        checkpointsList.style.maxHeight = '300px';
+        checkpointsList.style.overflowY = 'auto';
+        checkpointsList.style.overflowX = 'hidden';
+        checkpointsList.style.width = '100%';
+        checkpointsList.style.boxSizing = 'border-box';
+
+        checkpointsCard.body.appendChild(checkpointsList);
+        this.container.appendChild(checkpointsCard.element);
+        this.checkpointsCard = checkpointsCard.element;
+        this.checkpointsList = checkpointsList;
+
+        // Initial render
+        this.updateCheckpointsCard();
+    };
+
+    LevelEditor.prototype.updateCheckpointsCard = function updateCheckpointsCard() {
+        if (!this.checkpointsList) return;
+
+        this.checkpointsList.innerHTML = '';
+
+        if (this.editorState.checkpoints.length === 0) {
+            const emptyMessage = document.createElement('div');
+            emptyMessage.className = 'ui-row';
+            emptyMessage.style.fontSize = '13px';
+            emptyMessage.style.color = 'var(--hud-muted)';
+            emptyMessage.style.fontStyle = 'italic';
+            emptyMessage.style.textAlign = 'center';
+            emptyMessage.style.padding = '20px 0';
+            emptyMessage.textContent = 'No checkpoints yet';
+            this.checkpointsList.appendChild(emptyMessage);
+            return;
+        }
+
+        // Sort checkpoints by ID for consistent ordering
+        const sortedCheckpoints = [...this.editorState.checkpoints].sort((a, b) => {
+            const aNum = parseInt(a.id.replace('CP', '')) || 0;
+            const bNum = parseInt(b.id.replace('CP', '')) || 0;
+            return aNum - bNum;
+        });
+
+        sortedCheckpoints.forEach((checkpoint, index) => {
+            const checkpointButton = document.createElement('button');
+            checkpointButton.type = 'button';
+            checkpointButton.className = 'checkpoint-button';
+            checkpointButton.style.display = 'flex';
+            checkpointButton.style.alignItems = 'center';
+            checkpointButton.style.justifyContent = 'center';
+            checkpointButton.style.width = '100%';
+            checkpointButton.style.padding = '12px 16px';
+            checkpointButton.style.fontSize = '15px';
+            checkpointButton.style.borderRadius = '8px';
+            checkpointButton.style.border = '2px solid var(--hud-border)';
+            checkpointButton.style.backgroundColor = this.editorState.selectedCheckpoints.includes(checkpoint.id) ?
+                'var(--hud-accent)' : 'var(--hud-surface)';
+            checkpointButton.style.color = this.editorState.selectedCheckpoints.includes(checkpoint.id) ?
+                '#ffffff' : 'var(--hud-text)';
+            checkpointButton.style.fontWeight = '600';
+            checkpointButton.style.cursor = 'pointer';
+            checkpointButton.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease';
+            checkpointButton.style.boxShadow = 'var(--hud-shadow)';
+            checkpointButton.style.position = 'relative';
+            checkpointButton.dataset.checkpointId = checkpoint.id;
+            checkpointButton.dataset.dragState = 'idle';
+            checkpointButton.dataset.dragIndex = String(index);
+
+            const label = document.createElement('span');
+            label.className = 'checkpoint-label';
+            label.textContent = checkpoint.id;
+            label.style.pointerEvents = 'none';
+            checkpointButton.appendChild(label);
+
+            // Create drag handle
+            const dotsMenu = document.createElement('div');
+            dotsMenu.className = 'checkpoint-dots-menu';
+            dotsMenu.textContent = '⠿';
+            dotsMenu.style.position = 'absolute';
+            dotsMenu.style.top = '50%';
+            dotsMenu.style.right = '12px';
+            dotsMenu.style.transform = 'translateY(-50%)';
+            dotsMenu.style.fontSize = '25px';
+            dotsMenu.style.fontWeight = '400';
+            dotsMenu.style.color = this.editorState.selectedCheckpoints.includes(checkpoint.id) ?
+                '#ffffff' : '#00000099';
+            dotsMenu.style.opacity = '0';
+            dotsMenu.style.transition = 'opacity 0.2s ease';
+            dotsMenu.style.cursor = 'grab';
+            dotsMenu.style.userSelect = 'none';
+            dotsMenu.style.pointerEvents = 'auto';
+            dotsMenu.dataset.dragHandle = 'true';
+            dotsMenu.title = 'Drag to reorder checkpoint';
+
+            const showDots = () => {
+                dotsMenu.style.opacity = '1';
+            };
+
+            const hideDots = () => {
+                dotsMenu.style.opacity = '0';
+            };
+
+            // Show dots on button hover
+            checkpointButton.addEventListener('mouseenter', () => {
+                if (!this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
+                    checkpointButton.style.transform = 'translate(-3px, -3px)';
+                    checkpointButton.style.boxShadow = 'none';
+                }
+                showDots();
+            });
+
+            checkpointButton.addEventListener('mouseleave', () => {
+                if (!this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
+                    checkpointButton.style.transform = 'none';
+                    checkpointButton.style.boxShadow = 'var(--hud-shadow)';
+                }
+                hideDots();
+            });
+
+            checkpointButton.addEventListener('focus', () => {
+                if (!this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
+                    checkpointButton.style.transform = 'translate(-3px, -3px)';
+                    checkpointButton.style.boxShadow = 'none';
+                }
+                showDots();
+            });
+
+            checkpointButton.addEventListener('blur', () => {
+                if (!this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
+                    checkpointButton.style.transform = 'none';
+                    checkpointButton.style.boxShadow = 'var(--hud-shadow)';
+                }
+                hideDots();
+            });
+
+            // Click handler - toggle selection
+            checkpointButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+
+                if (checkpointButton.dataset.dragState === 'dragging') {
+                    return;
+                }
+
+                // Don't select if clicking on dots menu
+                if (e.target === dotsMenu) return;
+
+                if (e.shiftKey) {
+                    // Multi-select with shift
+                    const currentIndex = this.editorState.selectedCheckpoints.indexOf(checkpoint.id);
+                    if (currentIndex > -1) {
+                        this.editorState.selectedCheckpoints.splice(currentIndex, 1);
+                    } else {
+                        this.editorState.selectedCheckpoints.push(checkpoint.id);
+                    }
+                } else {
+                    // Single select - toggle
+                    if (this.editorState.selectedCheckpoints.includes(checkpoint.id)) {
+                        // If already selected, deselect it
+                        this.editorState.selectedCheckpoints = [];
+                    } else {
+                        // Select only this one
+                        this.editorState.selectedCheckpoints = [checkpoint.id];
+                    }
+                }
+                this.updateCheckpointsCard();
+                this.render();
+            });
+
+            checkpointButton.appendChild(dotsMenu);
+            this.checkpointsList.appendChild(checkpointButton);
+        });
+        this.ensureCheckpointDragHandlers();
+    };
+
+    LevelEditor.prototype.ensureCheckpointDragHandlers = function ensureCheckpointDragHandlers() {
+        if (!this.checkpointsList) {
+            return;
+        }
+
+        if (!this._boundCheckpointPointerDown) {
+            this._boundCheckpointPointerDown = this.handleCheckpointPointerDown.bind(this);
+            this._boundCheckpointPointerMove = this.handleCheckpointPointerMove.bind(this);
+            this._boundCheckpointPointerUp = this.handleCheckpointPointerUp.bind(this);
+        }
+
+        if (this._checkpointDragList !== this.checkpointsList) {
+            if (this._checkpointDragList) {
+                this._checkpointDragList.removeEventListener('pointerdown', this._boundCheckpointPointerDown);
+            }
+            this._checkpointDragList = this.checkpointsList;
+            this._checkpointDragList.addEventListener('pointerdown', this._boundCheckpointPointerDown);
+        }
+    };
+
+    LevelEditor.prototype.handleCheckpointPointerDown = function handleCheckpointPointerDown(event) {
+        if (!this.checkpointsList) {
+            return;
+        }
+
+        if (event.button !== undefined && event.button !== 0 && event.pointerType !== 'touch') {
+            return;
+        }
+
+        const dragHandle = event.target.closest('.checkpoint-dots-menu');
+        if (!dragHandle) {
+            return;
+        }
+
+        const checkpointButton = dragHandle.closest('.checkpoint-button');
+        if (!checkpointButton) {
+            return;
+        }
+
+        if (checkpointButton.dataset.dragState === 'dragging') {
+            return;
+        }
+
+        event.preventDefault();
+
+        const checkpointId = checkpointButton.dataset.checkpointId;
+        const selectedIds = Array.isArray(this.editorState.selectedCheckpoints)
+            ? [...this.editorState.selectedCheckpoints]
+            : [];
+        const allButtons = Array.from(this.checkpointsList.querySelectorAll('.checkpoint-button'));
+        const idToButton = new Map(allButtons.map(button => [button.dataset.checkpointId, button]));
+
+        let draggedItems = [];
+
+        if (selectedIds.includes(checkpointId) && selectedIds.length > 1) {
+            draggedItems = selectedIds
+                .map(id => idToButton.get(id))
+                .filter(Boolean);
+        }
+
+        if (draggedItems.length === 0) {
+            draggedItems = [checkpointButton];
+        }
+
+        const uniqueDragged = Array.from(new Set(draggedItems));
+        let orderedDragged = uniqueDragged.sort((a, b) => allButtons.indexOf(a) - allButtons.indexOf(b));
+        const orderedIndices = orderedDragged.map(item => allButtons.indexOf(item)).filter(index => index >= 0);
+        const isContiguous = orderedIndices.every((index, idx) => idx === 0 || index === orderedIndices[idx - 1] + 1);
+        if (!isContiguous) {
+            orderedDragged = [checkpointButton];
+        }
+
+        const draggedRects = orderedDragged.map(item => ({
+            item,
+            rect: item.getBoundingClientRect()
+        }));
+
+        const baseRectEntry = draggedRects.reduce((acc, entry) => {
+            if (!acc || entry.rect.top < acc.rect.top) {
+                return entry;
+            }
+            return acc;
+        }, null);
+
+        const baseRect = baseRectEntry ? baseRectEntry.rect : checkpointButton.getBoundingClientRect();
+        const blockBottom = draggedRects.reduce((bottom, entry) => Math.max(bottom, entry.rect.bottom), baseRect.bottom);
+        const blockHeight = blockBottom - baseRect.top;
+        const relativeOffsets = new Map();
+        draggedRects.forEach(({ item, rect }) => {
+            relativeOffsets.set(item, {
+                x: rect.left - baseRect.left,
+                y: rect.top - baseRect.top
+            });
+        });
+
+        const pointerId = event.pointerId;
+        if (pointerId !== undefined && checkpointButton.setPointerCapture) {
+            try {
+                checkpointButton.setPointerCapture(pointerId);
+            } catch (captureError) {
+                // Ignore pointer capture errors (e.g., on unsupported devices)
+            }
+        }
+
+        this._checkpointDragState = {
+            pointerId,
+            container: this.checkpointsList,
+            primaryItem: checkpointButton,
+            draggedItems: orderedDragged,
+            startX: event.clientX,
+            startY: event.clientY,
+            lastX: event.clientX,
+            lastY: event.clientY,
+            isActive: false,
+            items: [],
+            idleItems: [],
+            itemsGap: 0,
+            prevRect: null,
+            baseRect,
+            blockHeight,
+            relativeOffsets,
+            pointerOffsetX: 0,
+            pointerOffsetY: 0
+        };
+
+        window.addEventListener('pointermove', this._boundCheckpointPointerMove, { passive: false });
+        window.addEventListener('pointerup', this._boundCheckpointPointerUp);
+        window.addEventListener('pointercancel', this._boundCheckpointPointerUp);
+    };
+
+    LevelEditor.prototype.handleCheckpointPointerMove = function handleCheckpointPointerMove(event) {
+        const state = this._checkpointDragState;
+        if (!state) {
+            return;
+        }
+
+        if (state.pointerId !== undefined && event.pointerId !== state.pointerId) {
+            return;
+        }
+
+        if (!state.isActive) {
+            const dx = event.clientX - state.startX;
+            const dy = event.clientY - state.startY;
+            if (Math.abs(dx) < 3 && Math.abs(dy) < 3) {
+                return;
+            }
+            this.startCheckpointDragInteraction(state);
+        }
+
+        if (!state.isActive) {
+            return;
+        }
+
+        event.preventDefault();
+
+        const clientX = event.clientX;
+        const clientY = event.clientY;
+
+        state.lastX = clientX;
+        state.lastY = clientY;
+
+        const offsetX = clientX - state.startX;
+        const offsetY = clientY - state.startY;
+
+        state.pointerOffsetX = offsetX;
+        state.pointerOffsetY = offsetY;
+
+        state.draggedItems.forEach(item => {
+            const offsets = state.relativeOffsets.get(item) || { x: 0, y: 0 };
+            const translateX = offsetX + offsets.x;
+            const translateY = offsetY + offsets.y;
+            item.style.transform = `translate(${translateX}px, ${translateY}px)`;
+        });
+
+        this.updateCheckpointDragIdleItems(state);
+    };
+
+    LevelEditor.prototype.handleCheckpointPointerUp = function handleCheckpointPointerUp(event) {
+        const state = this._checkpointDragState;
+        if (!state) {
+            return;
+        }
+
+        if (state.pointerId !== undefined && event.pointerId !== state.pointerId) {
+            return;
+        }
+
+        const primaryItem = state.primaryItem;
+        if (primaryItem && state.pointerId !== undefined && primaryItem.releasePointerCapture) {
+            try {
+                primaryItem.releasePointerCapture(state.pointerId);
+            } catch (releaseError) {
+                // Ignore release errors
+            }
+        }
+
+        window.removeEventListener('pointermove', this._boundCheckpointPointerMove);
+        window.removeEventListener('pointerup', this._boundCheckpointPointerUp);
+        window.removeEventListener('pointercancel', this._boundCheckpointPointerUp);
+
+        if (state.isActive) {
+            this.finalizeCheckpointDrag(state, event);
+        } else {
+            this.resetCheckpointDragState(state);
+        }
+    };
+
+    LevelEditor.prototype.startCheckpointDragInteraction = function startCheckpointDragInteraction(state) {
+        if (!state || state.isActive) {
+            return;
+        }
+
+        state.isActive = true;
+
+        const items = Array.from(state.container.querySelectorAll('.checkpoint-button'));
+        state.items = items;
+        const draggedSet = new Set(state.draggedItems);
+        state.idleItems = items.filter(item => !draggedSet.has(item));
+        const draggedIndices = state.draggedItems.map(item => items.indexOf(item)).filter(index => index >= 0);
+        state.draggedIndices = draggedIndices;
+        const minDraggedIndex = draggedIndices.length ? Math.min(...draggedIndices) : 0;
+
+        const recalculatedRects = state.draggedItems.map(item => ({
+            item,
+            rect: item.getBoundingClientRect()
+        }));
+
+        if (recalculatedRects.length) {
+            const topEntry = recalculatedRects.reduce((acc, entry) => (entry.rect.top < acc.rect.top ? entry : acc), recalculatedRects[0]);
+            const baseRect = topEntry.rect;
+            const blockBottom = recalculatedRects.reduce((bottom, entry) => Math.max(bottom, entry.rect.bottom), baseRect.bottom);
+            state.baseRect = baseRect;
+            state.blockHeight = blockBottom - baseRect.top;
+            const newOffsets = new Map();
+            recalculatedRects.forEach(({ item, rect }) => {
+                newOffsets.set(item, {
+                    x: rect.left - baseRect.left,
+                    y: rect.top - baseRect.top
+                });
+            });
+            state.relativeOffsets = newOffsets;
+        }
+
+        items.forEach((item, index) => {
+            item.dataset.dragIndex = String(index);
+            if (!draggedSet.has(item)) {
+                item.dataset.dragState = 'idle';
+                item.style.transition = 'transform 0.2s ease';
+            }
+        });
+
+        state.draggedItems.forEach(item => {
+            item.dataset.dragState = 'dragging';
+            item.classList.add('checkpoint-button--dragging');
+            item.style.transition = 'none';
+            item.style.zIndex = '30';
+        });
+
+        state.idleItems.forEach(item => {
+            const itemIndex = items.indexOf(item);
+            if (itemIndex < minDraggedIndex) {
+                item.dataset.dragIsAbove = 'true';
+            } else {
+                item.removeAttribute('data-drag-is-above');
+            }
+            item.removeAttribute('data-drag-is-toggled');
+        });
+
+        state.prevRect = state.primaryItem.getBoundingClientRect();
+        state.itemsGap = this.computeCheckpointItemsGap(state);
+
+        this.lockCheckpointScroll();
+    };
+
+    LevelEditor.prototype.updateCheckpointDragIdleItems = function updateCheckpointDragIdleItems(state) {
+        if (!state || !state.isActive) {
+            return;
+        }
+
+        const blockTop = state.baseRect.top + state.pointerOffsetY;
+        const blockCenterY = blockTop + state.blockHeight / 2;
+
+        state.idleItems.forEach(item => {
+            const itemRect = item.getBoundingClientRect();
+            const itemCenterY = itemRect.top + itemRect.height / 2;
+            const isAbove = item.hasAttribute('data-drag-is-above');
+            const shouldToggle = isAbove ? blockCenterY <= itemCenterY : blockCenterY >= itemCenterY;
+
+            if (shouldToggle) {
+                if (!item.hasAttribute('data-drag-is-toggled')) {
+                    item.dataset.dragIsToggled = 'true';
+                    const direction = isAbove ? 1 : -1;
+                    const translate = direction * (state.blockHeight + state.itemsGap);
+                    item.style.transform = `translateY(${translate}px)`;
+                }
+            } else if (item.hasAttribute('data-drag-is-toggled')) {
+                item.removeAttribute('data-drag-is-toggled');
+                item.style.transform = 'translateY(0px)';
+            }
+        });
+    };
+
+    LevelEditor.prototype.finalizeCheckpointDrag = function finalizeCheckpointDrag(state, event) {
+        if (!state || !state.isActive) {
+            return;
+        }
+
+        const container = state.container;
+        const items = state.items && state.items.length ? state.items : Array.from(container.querySelectorAll('.checkpoint-button'));
+        const draggedItems = state.draggedItems || [state.primaryItem];
+        const draggedSet = new Set(draggedItems);
+        const otherItems = items.filter(item => !draggedSet.has(item));
+        const draggedOrdered = draggedItems.slice().sort((a, b) => items.indexOf(a) - items.indexOf(b));
+
+        const blockTop = state.baseRect.top + state.pointerOffsetY;
+        const blockCenterY = blockTop + state.blockHeight / 2;
+
+        let insertIndex = otherItems.length;
+        for (let i = 0; i < otherItems.length; i += 1) {
+            const rect = otherItems[i].getBoundingClientRect();
+            const center = rect.top + rect.height / 2;
+            if (blockCenterY < center) {
+                insertIndex = i;
+                break;
+            }
+        }
+
+        const newOrder = [
+            ...otherItems.slice(0, insertIndex),
+            ...draggedOrdered,
+            ...otherItems.slice(insertIndex)
+        ];
+
+        newOrder.forEach(item => {
+            container.appendChild(item);
+        });
+
+        state.idleItems.forEach(item => {
+            item.style.transition = 'transform 0.2s ease';
+            item.style.transform = 'translateY(0px)';
+            item.removeAttribute('data-drag-is-toggled');
+            item.removeAttribute('data-drag-is-above');
+        });
+
+        const idMap = this.applyCheckpointOrderFromElements(newOrder);
+
+        newOrder.forEach(item => {
+            const oldId = item.dataset.checkpointId;
+            const newId = idMap.get(oldId) || oldId;
+            if (newId !== oldId) {
+                item.dataset.checkpointId = newId;
+                const labelEl = item.querySelector('.checkpoint-label');
+                if (labelEl) {
+                    labelEl.textContent = newId;
+                }
+            }
+        });
+
+        const animateItems = draggedOrdered.slice();
+        const cleanup = () => {
+            this.resetCheckpointDragState(state);
+            this.updateCheckpointsCard();
+            this.render();
+        };
+
+        let pendingAnimations = animateItems.length;
+        if (pendingAnimations === 0) {
+            cleanup();
+            return;
+        }
+
+        animateItems.forEach(item => {
+            const currentRect = item.getBoundingClientRect();
+            item.style.transition = 'none';
+            item.style.transform = '';
+            const targetRect = item.getBoundingClientRect();
+            const deltaX = currentRect.left - targetRect.left;
+            const deltaY = currentRect.top - targetRect.top;
+
+            item.style.transform = `translate(${deltaX}px, ${deltaY}px)`;
+
+            requestAnimationFrame(() => {
+                item.style.transition = 'transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1)';
+                item.style.transform = 'translate(0px, 0px)';
+                item.addEventListener('transitionend', () => {
+                    pendingAnimations -= 1;
+                    if (pendingAnimations === 0) {
+                        cleanup();
+                    }
+                }, { once: true });
+            });
+        });
+    };
+
+    LevelEditor.prototype.computeCheckpointItemsGap = function computeCheckpointItemsGap(state) {
+        if (!state || state.idleItems.length <= 1) {
+            return 0;
+        }
+
+        const firstRect = state.idleItems[0].getBoundingClientRect();
+        const secondRect = state.idleItems[1].getBoundingClientRect();
+        return Math.abs(firstRect.bottom - secondRect.top);
+    };
+
+    LevelEditor.prototype.applyCheckpointOrderFromElements = function applyCheckpointOrderFromElements(elements) {
+        const idToCheckpoint = new Map(this.editorState.checkpoints.map(cp => [cp.id, cp]));
+        const orderedCheckpoints = [];
+
+        elements.forEach(el => {
+            const checkpointId = el.dataset.checkpointId;
+            const checkpoint = idToCheckpoint.get(checkpointId);
+            if (checkpoint) {
+                orderedCheckpoints.push(checkpoint);
+            }
+        });
+
+        if (orderedCheckpoints.length !== elements.length) {
+            return new Map(elements.map(el => {
+                const checkpointId = el.dataset.checkpointId;
+                return [checkpointId, checkpointId];
+            }));
+        }
+
+        const idMap = new Map();
+        orderedCheckpoints.forEach((checkpoint, index) => {
+            const oldId = checkpoint.id;
+            const newId = `CP${index + 1}`;
+            idMap.set(oldId, newId);
+        });
+
+        orderedCheckpoints.forEach(checkpoint => {
+            const newId = idMap.get(checkpoint.id);
+            if (newId) {
+                checkpoint.id = newId;
+            }
+        });
+
+        this.editorState.checkpoints = orderedCheckpoints;
+        this.editorState.selectedCheckpoints = this.editorState.selectedCheckpoints
+            .map(id => idMap.get(id) || id)
+            .filter((id, index, arr) => id && arr.indexOf(id) === index);
+
+        this.markUnsavedChanges();
+
+        return idMap;
+    };
+
+    LevelEditor.prototype.resetCheckpointDragState = function resetCheckpointDragState(state) {
+        const dragState = state || this._checkpointDragState;
+        if (!dragState) {
+            return;
+        }
+
+        (dragState.draggedItems || []).forEach(item => {
+            item.classList.remove('checkpoint-button--dragging');
+            item.dataset.dragState = 'idle';
+            item.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease';
+            item.style.transform = 'translate(0px, 0px)';
+            item.style.zIndex = '';
+            delete item.dataset.dragIndex;
+        });
+
+        (dragState.idleItems || []).forEach(item => {
+            item.removeAttribute('data-drag-is-above');
+            item.removeAttribute('data-drag-is-toggled');
+            item.dataset.dragState = 'idle';
+            item.style.transform = 'translateY(0px)';
+            item.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease';
+            delete item.dataset.dragIndex;
+        });
+
+        this.unlockCheckpointScroll();
+
+        this._checkpointDragState = null;
+    };
+
+    LevelEditor.prototype.lockCheckpointScroll = function lockCheckpointScroll() {
+        if (this._checkpointScrollLocked) {
+            return;
+        }
+
+        this._checkpointScrollLocked = true;
+        this._checkpointScrollLockStyles = {
+            overflow: document.body.style.overflow,
+            touchAction: document.body.style.touchAction,
+            userSelect: document.body.style.userSelect
+        };
+
+        document.body.style.overflow = 'hidden';
+        document.body.style.touchAction = 'none';
+        document.body.style.userSelect = 'none';
+    };
+
+    LevelEditor.prototype.unlockCheckpointScroll = function unlockCheckpointScroll() {
+        if (!this._checkpointScrollLocked) {
+            return;
+        }
+
+        const styles = this._checkpointScrollLockStyles || {};
+        document.body.style.overflow = styles.overflow || '';
+        document.body.style.touchAction = styles.touchAction || '';
+        document.body.style.userSelect = styles.userSelect || '';
+
+        this._checkpointScrollLocked = false;
+        this._checkpointScrollLockStyles = null;
+    };
 }
+
+

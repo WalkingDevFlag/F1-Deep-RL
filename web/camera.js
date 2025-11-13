@@ -134,3 +134,7 @@ class Camera {
         return this.currentMode === this.modes.GODS_EYE ? "God's Eye View" : "Car Camera";
     }
 }
+
+if (typeof window !== 'undefined') {
+    window.Camera = Camera;
+}
