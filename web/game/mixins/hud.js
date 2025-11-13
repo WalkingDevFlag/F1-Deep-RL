@@ -79,7 +79,7 @@ export function applyHudMixin(Game) {
         hudCard.element.setAttribute('aria-label', 'Driver control panel');
 
         const fpsRow = createStatRow({ label: 'FPS', value: '0' });
-        const cameraRow = createStatRow({ label: 'Camera', value: cameraName });
+        const cameraRow = createStatRow({ label: '[C] Camera', value: cameraName });
         const sensorsRow = createToggleRow({
             label: 'Sensors',
             initial: sensorsEnabled,
