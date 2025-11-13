@@ -1,4 +1,32 @@
 (function (global) {
+    const DEFAULT_DT = 0.016;
+
+    const resolveDeltaTime = (deltaTime) => {
+        if (typeof deltaTime === 'number' && Number.isFinite(deltaTime) && deltaTime > 0) {
+            return deltaTime;
+        }
+        return DEFAULT_DT;
+    };
+
+    const INACTIVITY_CONFIG = {
+        speedThreshold: 2,
+        progressThreshold: 0.0005,
+        idleGracePeriod: 1.5,
+        idlePenaltyRate: 4,
+        spawnRadius: 320,
+        spawnGracePeriod: 4,
+        spawnPenaltyRate: 6,
+        spawnProgressExit: 0.02,
+        postResetGracePeriod: 1.5
+    };
+
+    const createInactivityState = () => ({
+        idleDuration: 0,
+        spawnDuration: 0,
+        hasClearedSpawn: false,
+        postResetDelay: INACTIVITY_CONFIG.postResetGracePeriod
+    });
+
     class TrainingController {
         constructor(game) {
             this.game = game;
@@ -37,6 +65,8 @@
             this.pauseStartTime = null;
             this.pausedElapsedTrainingTime = 0;
             this.pausedElapsedLapTime = 0;
+            this.spawnPoint = null;
+            this.inactivityState = createInactivityState();
         }
 
         async attachUI() {
@@ -290,6 +320,7 @@
                 this.isPaused = false;
                 this.pausedElapsedTrainingTime = 0;
                 this.pausedElapsedLapTime = 0;
+                this.inactivityState = createInactivityState();
                 this.updateStatus('Running');
             } catch (error) {
                 console.error('Failed to start training', error);
@@ -332,6 +363,7 @@
                 this.isPaused = false;
                 this.pausedElapsedTrainingTime = 0;
                 this.pausedElapsedLapTime = 0;
+                this.inactivityState = createInactivityState();
                 this.updateStatus('Idle');
                 this.setUIBusy(false);
                 this.updateUIState();
@@ -381,6 +413,8 @@
             }
 
             const checkpointMetrics = this.computeCheckpointMetrics();
+            const previousProgress = this.prevProgressWithinLap;
+            const progressDelta = checkpointMetrics.progressWithinLap - previousProgress;
             const stateVector = this.buildStateVector();
             if (!stateVector || stateVector.length !== this.stateSize) {
                 return;
@@ -397,6 +431,11 @@
                 reward += this.computeSpeedReward(deltaTime);
                 reward += this.computeSmoothDrivingReward(deltaTime);
                 reward += this.computeCollisionPenalty();
+                reward += this.computeInactivityPenalty({
+                    deltaTime,
+                    progressDelta,
+                    progressWithinLap: checkpointMetrics.progressWithinLap
+                });
             }
 
             // Update current reward
@@ -653,6 +692,69 @@
             return 0;
         }
 
+        computeInactivityPenalty({ deltaTime, progressDelta, progressWithinLap }) {
+            const car = this.game.car;
+            if (!car) {
+                this.inactivityState = createInactivityState();
+                return 0;
+            }
+
+            const dt = resolveDeltaTime(deltaTime);
+            if (dt <= 0) {
+                return 0;
+            }
+
+            const inactivity = this.inactivityState || createInactivityState();
+            this.inactivityState = inactivity;
+
+            if (inactivity.postResetDelay > 0) {
+                inactivity.postResetDelay = Math.max(0, inactivity.postResetDelay - dt);
+                return 0;
+            }
+
+            const speed = Math.abs(car.speed || 0);
+            const absProgressDelta = Math.abs(progressDelta || 0);
+            const moving = speed > INACTIVITY_CONFIG.speedThreshold;
+            const makingProgress = absProgressDelta > INACTIVITY_CONFIG.progressThreshold;
+
+            let penalty = 0;
+
+            if (moving || makingProgress) {
+                inactivity.idleDuration = 0;
+            } else {
+                inactivity.idleDuration += dt;
+                if (inactivity.idleDuration > INACTIVITY_CONFIG.idleGracePeriod) {
+                    penalty += -INACTIVITY_CONFIG.idlePenaltyRate * dt;
+                }
+            }
+
+            const spawnPoint = this.spawnPoint;
+            let inSpawnRadius = false;
+            if (spawnPoint) {
+                const dx = (car.x || 0) - spawnPoint.x;
+                const dy = (car.y || 0) - spawnPoint.y;
+                const distance = Math.hypot(dx, dy);
+                inSpawnRadius = distance <= INACTIVITY_CONFIG.spawnRadius;
+
+                if (!inactivity.hasClearedSpawn && (progressWithinLap > INACTIVITY_CONFIG.spawnProgressExit || distance > INACTIVITY_CONFIG.spawnRadius * 1.25)) {
+                    inactivity.hasClearedSpawn = true;
+                }
+            }
+
+            const idleNearSpawn = inSpawnRadius && !moving && !makingProgress;
+
+            if (idleNearSpawn) {
+                inactivity.spawnDuration += dt;
+                if (inactivity.spawnDuration > INACTIVITY_CONFIG.spawnGracePeriod) {
+                    penalty += -INACTIVITY_CONFIG.spawnPenaltyRate * dt;
+                }
+            } else {
+                inactivity.spawnDuration = 0;
+            }
+
+            return penalty;
+        }
+
         buildStateVector() {
             const car = this.game.car;
             if (!car) {
@@ -753,6 +855,11 @@
             this.checkpointState.nextIndex = 0;
             this.checkpointState.distanceNorm = 1;
             this.checkpointState.progressWithinLap = 0;
+            const spawn = track && typeof track.getSpawnPoint === 'function'
+                ? track.getSpawnPoint()
+                : null;
+            this.spawnPoint = spawn ? { x: spawn.x, y: spawn.y } : null;
+            this.inactivityState = createInactivityState();
         }
 
         onGameReset() {
@@ -771,6 +878,7 @@
                 this.totalReward = 0;
                 this.updateStatsDisplay();
             }
+            this.inactivityState = createInactivityState();
         }
     }
 

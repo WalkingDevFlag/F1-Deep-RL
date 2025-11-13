@@ -5,11 +5,25 @@ const MANUAL_POLICY_LABELS = {
     forwardSpeed: 'Forward speed reward',
     timePenalty: 'Time penalty',
     headingStability: 'Heading stability reward',
-    collisionPenalty: 'Collision penalty'
+    collisionPenalty: 'Collision penalty',
+    stalledPenalty: 'Idle/stall penalty',
+    spawnPenalty: 'Spawn camping penalty'
 };
 
 const MANUAL_POLICY_KEYS = Object.keys(MANUAL_POLICY_LABELS);
 const DEFAULT_DT = 0.016;
+
+const INACTIVITY_CONFIG = {
+    speedThreshold: 2,
+    progressThreshold: 0.0005,
+    idleGracePeriod: 1.5,
+    idlePenaltyRate: 4,
+    spawnRadius: 320,
+    spawnGracePeriod: 4,
+    spawnPenaltyRate: 6,
+    spawnProgressExit: 0.02,
+    postResetGracePeriod: 1.5
+};
 
 const createManualPolicyState = () => MANUAL_POLICY_KEYS.reduce((accumulator, key) => {
     accumulator[key] = false;
@@ -20,6 +34,13 @@ const createManualContributionState = () => MANUAL_POLICY_KEYS.reduce((accumulat
     accumulator[key] = 0;
     return accumulator;
 }, {});
+
+const createInactivityState = () => ({
+    idleDuration: 0,
+    spawnDuration: 0,
+    hasClearedSpawn: false,
+    postResetDelay: INACTIVITY_CONFIG.postResetGracePeriod
+});
 
 const resolveDeltaTime = (deltaTime) => {
     if (typeof deltaTime === 'number' && Number.isFinite(deltaTime) && deltaTime > 0) {
@@ -50,7 +71,9 @@ export function applyManualRewardMixin(Game) {
             policyImplemented: createManualPolicyState(),
             contributions: createManualContributionState(),
             policyCheckElapsed: 0,
-            policyWarned: false
+            policyWarned: false,
+            spawnPoint: null,
+            inactivity: createInactivityState()
         };
     };
 
@@ -84,6 +107,14 @@ export function applyManualRewardMixin(Game) {
         this.manualReward.contributions = createManualContributionState();
         this.manualReward.policyCheckElapsed = 0;
         this.manualReward.policyWarned = false;
+
+        const spawn = this.track && typeof this.track.getSpawnPoint === 'function'
+            ? this.track.getSpawnPoint()
+            : null;
+        this.manualReward.spawnPoint = spawn
+            ? { x: spawn.x, y: spawn.y }
+            : null;
+        this.manualReward.inactivity = createInactivityState();
     };
 
     Game.prototype.resetManualReward = function resetManualReward() {
@@ -110,6 +141,14 @@ export function applyManualRewardMixin(Game) {
         state.nextIndex = 0;
         state.distanceNorm = 1;
         state.progressWithinLap = 0;
+
+        const spawn = this.track && typeof this.track.getSpawnPoint === 'function'
+            ? this.track.getSpawnPoint()
+            : null;
+        this.manualReward.spawnPoint = spawn
+            ? { x: spawn.x, y: spawn.y }
+            : null;
+        this.manualReward.inactivity = createInactivityState();
     };
 
     Game.prototype.updateManualReward = function updateManualReward(deltaTime) {
@@ -146,6 +185,8 @@ export function applyManualRewardMixin(Game) {
         tracker.policyImplemented = policyImplemented;
 
         const metrics = this.computeManualCheckpointMetrics();
+        const previousProgress = tracker.prevProgressWithinLap;
+        const progressDelta = metrics.progressWithinLap - previousProgress;
 
         if (tracker.justReset) {
             tracker.prevProgressWithinLap = metrics.progressWithinLap || 0;
@@ -154,6 +195,7 @@ export function applyManualRewardMixin(Game) {
             tracker.prevSteeringAngle = this.car ? this.car.angle || 0 : 0;
             tracker.current = 0;
             tracker.justReset = false;
+            tracker.inactivity = createInactivityState();
             return;
         }
 
@@ -190,6 +232,19 @@ export function applyManualRewardMixin(Game) {
         contributions.collisionPenalty = collisionPenalty;
         policyImplemented.collisionPenalty = true;
         reward += collisionPenalty;
+
+        const inactivityPenalty = this.computeManualInactivityPenalty({
+            deltaTime: dt,
+            progressDelta,
+            progressWithinLap: metrics.progressWithinLap
+        });
+        contributions.stalledPenalty = inactivityPenalty.stalledPenalty;
+        policyImplemented.stalledPenalty = true;
+        reward += inactivityPenalty.stalledPenalty;
+
+        contributions.spawnPenalty = inactivityPenalty.spawnPenalty;
+        policyImplemented.spawnPenalty = true;
+        reward += inactivityPenalty.spawnPenalty;
 
         tracker.current = reward;
         tracker.total += reward;
@@ -363,5 +418,71 @@ export function applyManualRewardMixin(Game) {
             return -20;
         }
         return 0;
+    };
+
+    Game.prototype.computeManualInactivityPenalty = function computeManualInactivityPenalty({ deltaTime, progressDelta, progressWithinLap }) {
+        const tracker = this.manualReward;
+        const inactivity = tracker.inactivity || createInactivityState();
+        tracker.inactivity = inactivity;
+
+        const dt = resolveDeltaTime(deltaTime);
+
+        if (dt <= 0) {
+            return { stalledPenalty: 0, spawnPenalty: 0 };
+        }
+
+        if (inactivity.postResetDelay > 0) {
+            inactivity.postResetDelay = Math.max(0, inactivity.postResetDelay - dt);
+            return { stalledPenalty: 0, spawnPenalty: 0 };
+        }
+
+        const car = this.car;
+        if (!car) {
+            inactivity.idleDuration = 0;
+            inactivity.spawnDuration = 0;
+            return { stalledPenalty: 0, spawnPenalty: 0 };
+        }
+
+        const speed = Math.abs(car.speed || 0);
+        const absProgressDelta = Math.abs(progressDelta || 0);
+        const moving = speed > INACTIVITY_CONFIG.speedThreshold;
+        const makingProgress = absProgressDelta > INACTIVITY_CONFIG.progressThreshold;
+        let stalledPenalty = 0;
+        let spawnPenalty = 0;
+
+        if (moving || makingProgress) {
+            inactivity.idleDuration = 0;
+        } else {
+            inactivity.idleDuration += dt;
+            if (inactivity.idleDuration > INACTIVITY_CONFIG.idleGracePeriod) {
+                stalledPenalty = -INACTIVITY_CONFIG.idlePenaltyRate * dt;
+            }
+        }
+
+        const spawnPoint = tracker.spawnPoint;
+        let inSpawnRadius = false;
+        if (spawnPoint) {
+            const dx = (car.x || 0) - spawnPoint.x;
+            const dy = (car.y || 0) - spawnPoint.y;
+            const distance = Math.hypot(dx, dy);
+            inSpawnRadius = distance <= INACTIVITY_CONFIG.spawnRadius;
+
+            if (!inactivity.hasClearedSpawn && (progressWithinLap > INACTIVITY_CONFIG.spawnProgressExit || distance > INACTIVITY_CONFIG.spawnRadius * 1.25)) {
+                inactivity.hasClearedSpawn = true;
+            }
+        }
+
+        const idleNearSpawn = inSpawnRadius && !moving && !makingProgress;
+
+        if (idleNearSpawn) {
+            inactivity.spawnDuration += dt;
+            if (inactivity.spawnDuration > INACTIVITY_CONFIG.spawnGracePeriod) {
+                spawnPenalty = -INACTIVITY_CONFIG.spawnPenaltyRate * dt;
+            }
+        } else {
+            inactivity.spawnDuration = 0;
+        }
+
+        return { stalledPenalty, spawnPenalty };
     };
 }
