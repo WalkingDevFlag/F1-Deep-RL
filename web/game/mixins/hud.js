@@ -181,7 +181,7 @@ export function applyHudMixin(Game) {
                 }
             });
 
-            dock.addMany([homeButton, toggleUIButton, levelEditorButton]);
+            dock.addMany([homeButton, levelEditorButton, toggleUIButton]);
             if (document.body) {
                 document.body.appendChild(dock.element);
             }
