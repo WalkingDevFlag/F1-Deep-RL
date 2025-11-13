@@ -1,18 +1,15 @@
 const MANUAL_POLICY_LABELS = {
-    forwardSpeed: 'Forward speed reward',
-    clearance: 'Clearance reward',
-    headingStability: 'Heading stability reward',
-    progress: 'Progress reward',
     checkpoint: 'Checkpoint capture reward',
+    progress: 'Progress reward',
     lapCompletion: 'Lap completion bonus',
+    forwardSpeed: 'Forward speed reward',
     timePenalty: 'Time penalty',
-    collisionPenalty: 'Collision penalty',
-    steeringPenalty: 'Steering-change penalty',
-    reversePenalty: 'Reverse-speed penalty',
-    stuckPenalty: 'Stuck/off-track penalty'
+    headingStability: 'Heading stability reward',
+    collisionPenalty: 'Collision penalty'
 };
 
 const MANUAL_POLICY_KEYS = Object.keys(MANUAL_POLICY_LABELS);
+const DEFAULT_DT = 0.016;
 
 const createManualPolicyState = () => MANUAL_POLICY_KEYS.reduce((accumulator, key) => {
     accumulator[key] = false;
@@ -24,19 +21,22 @@ const createManualContributionState = () => MANUAL_POLICY_KEYS.reduce((accumulat
     return accumulator;
 }, {});
 
+const resolveDeltaTime = (deltaTime) => {
+    if (typeof deltaTime === 'number' && Number.isFinite(deltaTime) && deltaTime > 0) {
+        return deltaTime;
+    }
+    return DEFAULT_DT;
+};
+
 export function applyManualRewardMixin(Game) {
     Game.prototype.initializeManualRewardTracking = function initializeManualRewardTracking() {
-        const now = typeof performance !== 'undefined' && typeof performance.now === 'function'
-            ? performance.now()
-            : Date.now();
-
         this.manualReward = {
             total: 0,
             current: 0,
             prevLapCount: this.lapCount || 0,
             prevProgressWithinLap: 0,
-            prevDamaged: false,
-            prevSteeringAngle: 0,
+            prevDamaged: this.car ? !!this.car.damaged : false,
+            prevSteeringAngle: this.car ? this.car.angle || 0 : 0,
             checkpointState: {
                 total: 0,
                 totalCleared: 0,
@@ -46,12 +46,11 @@ export function applyManualRewardMixin(Game) {
             },
             collisionSinceLastLap: false,
             justReset: true,
+            frozen: false,
             policyImplemented: createManualPolicyState(),
             contributions: createManualContributionState(),
             policyCheckElapsed: 0,
-            policyWarned: false,
-            frozen: false,
-            lastUpdate: now
+            policyWarned: false
         };
     };
 
@@ -80,6 +79,11 @@ export function applyManualRewardMixin(Game) {
         this.manualReward.prevSteeringAngle = this.car ? this.car.angle || 0 : 0;
         this.manualReward.collisionSinceLastLap = false;
         this.manualReward.justReset = true;
+        this.manualReward.frozen = false;
+        this.manualReward.policyImplemented = createManualPolicyState();
+        this.manualReward.contributions = createManualContributionState();
+        this.manualReward.policyCheckElapsed = 0;
+        this.manualReward.policyWarned = false;
     };
 
     Game.prototype.resetManualReward = function resetManualReward() {
@@ -95,11 +99,11 @@ export function applyManualRewardMixin(Game) {
         this.manualReward.prevSteeringAngle = this.car ? this.car.angle || 0 : 0;
         this.manualReward.collisionSinceLastLap = false;
         this.manualReward.justReset = true;
+        this.manualReward.frozen = false;
         this.manualReward.policyImplemented = createManualPolicyState();
         this.manualReward.contributions = createManualContributionState();
         this.manualReward.policyCheckElapsed = 0;
         this.manualReward.policyWarned = false;
-        this.manualReward.frozen = false;
 
         const state = this.manualReward.checkpointState;
         state.totalCleared = 0;
@@ -130,6 +134,8 @@ export function applyManualRewardMixin(Game) {
             return;
         }
 
+        const dt = resolveDeltaTime(deltaTime);
+
         const contributions = tracker.contributions || createManualContributionState();
         tracker.contributions = contributions;
         MANUAL_POLICY_KEYS.forEach((key) => {
@@ -151,13 +157,12 @@ export function applyManualRewardMixin(Game) {
             return;
         }
 
-        const dt = typeof deltaTime === 'number' && deltaTime > 0 ? deltaTime : 0.016;
-
         let reward = 0;
 
-        contributions.checkpoint = metrics.checkpointReward;
+        const checkpointReward = metrics.checkpointReward;
+        contributions.checkpoint = checkpointReward;
         policyImplemented.checkpoint = true;
-        reward += contributions.checkpoint;
+        reward += checkpointReward;
 
         const progressReward = this.computeManualProgressDelta(metrics.progressWithinLap);
         contributions.progress = progressReward;
@@ -169,23 +174,12 @@ export function applyManualRewardMixin(Game) {
         policyImplemented.lapCompletion = true;
         reward += lapReward;
 
-        const clearanceResult = this.computeManualClearanceReward();
-        contributions.clearance = clearanceResult.value;
-        if (clearanceResult.hasData) {
-            policyImplemented.clearance = true;
-        }
-        reward += clearanceResult.value;
-
-        const speedComponents = this.computeManualSpeedReward(dt);
+        const speedComponents = this.computeManualSpeedComponents(dt);
         contributions.forwardSpeed = speedComponents.forward;
         contributions.timePenalty = speedComponents.timePenalty;
-        contributions.reversePenalty = speedComponents.reversePenalty;
         policyImplemented.forwardSpeed = true;
         policyImplemented.timePenalty = true;
-        if (Math.abs(speedComponents.reversePenalty) > 1e-6) {
-            policyImplemented.reversePenalty = true;
-        }
-        reward += speedComponents.forward + speedComponents.timePenalty + speedComponents.reversePenalty;
+        reward += speedComponents.forward + speedComponents.timePenalty;
 
         const headingReward = this.computeManualSmoothDrivingReward(dt);
         contributions.headingStability = headingReward;
@@ -207,17 +201,11 @@ export function applyManualRewardMixin(Game) {
 
         tracker.policyCheckElapsed += dt;
         if (!tracker.policyWarned && tracker.policyCheckElapsed >= 5) {
-            const missingPolicies = [];
-            MANUAL_POLICY_KEYS.forEach((key) => {
-                if (!policyImplemented[key]) {
-                    missingPolicies.push(MANUAL_POLICY_LABELS[key]);
-                }
-            });
-
+            const missingPolicies = MANUAL_POLICY_KEYS.filter((key) => !policyImplemented[key])
+                .map((key) => MANUAL_POLICY_LABELS[key]);
             if (missingPolicies.length > 0) {
                 console.warn('Manual episode reward missing policies:', missingPolicies.join(', '));
             }
-
             tracker.policyWarned = true;
         }
     };
@@ -228,25 +216,27 @@ export function applyManualRewardMixin(Game) {
             ? this.track.getCheckpoints() || []
             : [];
         const total = Array.isArray(checkpoints) ? checkpoints.length : 0;
-        tracker.checkpointState.total = total;
+        const state = tracker.checkpointState;
+        state.total = total;
 
         if (!total || !this.car) {
-            tracker.checkpointState.distanceNorm = 1;
-            tracker.checkpointState.progressWithinLap = 0;
+            state.distanceNorm = 1;
+            state.progressWithinLap = 0;
             return {
                 checkpointReward: 0,
+                distanceNorm: 1,
                 progressWithinLap: 0,
                 nextCheckpointIndex: 0
             };
         }
 
-        const state = tracker.checkpointState;
         const nextIndex = state.nextIndex % total;
         const checkpoint = checkpoints[nextIndex];
         if (!checkpoint) {
             state.distanceNorm = 1;
             return {
                 checkpointReward: 0,
+                distanceNorm: 1,
                 progressWithinLap: state.progressWithinLap,
                 nextCheckpointIndex: nextIndex
             };
@@ -258,9 +248,7 @@ export function applyManualRewardMixin(Game) {
         const captureRadius = checkpoint.radius || 180;
         const farRadius = captureRadius * 3;
         const distanceNorm = Math.min(distance / farRadius, 1);
-        const progressWithinLap = total > 0
-            ? ((state.totalCleared % total) + (1 - distanceNorm)) / total
-            : 0;
+        const progressWithinLap = ((state.totalCleared % total) + (1 - distanceNorm)) / total;
 
         let checkpointReward = 0;
         if (distance <= captureRadius) {
@@ -276,6 +264,7 @@ export function applyManualRewardMixin(Game) {
 
         return {
             checkpointReward,
+            distanceNorm,
             progressWithinLap: state.progressWithinLap,
             nextCheckpointIndex: state.nextIndex
         };
@@ -328,73 +317,26 @@ export function applyManualRewardMixin(Game) {
         return 0;
     };
 
-    Game.prototype.computeManualClearanceReward = function computeManualClearanceReward() {
-        const result = {
-            value: 0,
-            hasData: false
-        };
-
-        const car = this.car;
-        if (!car || !car.sensor || !Array.isArray(car.sensor.readings)) {
-            return result;
-        }
-
-        const readings = car.sensor.readings;
-        if (!readings.length) {
-            return result;
-        }
-
-        let sum = 0;
-        let count = 0;
-        readings.forEach((reading) => {
-            if (reading && typeof reading.offset === 'number') {
-                const offset = Math.min(Math.max(reading.offset, 0), 1);
-                sum += 1 - offset;
-                count += 1;
-            }
-        });
-
-        if (count === 0) {
-            return result;
-        }
-
-        result.hasData = true;
-        const averageClearance = sum / count;
-        result.value = averageClearance * 2.2;
-        return result;
-    };
-
-    Game.prototype.computeManualSpeedReward = function computeManualSpeedReward(deltaTime) {
+    Game.prototype.computeManualSpeedComponents = function computeManualSpeedComponents(dt) {
         const car = this.car;
         if (!car) {
-            return {
-                forward: 0,
-                timePenalty: 0,
-                reversePenalty: 0
-            };
+            return { forward: 0, timePenalty: 0 };
         }
 
-        const dt = typeof deltaTime === 'number' && deltaTime > 0 ? deltaTime : 0.016;
+        const delta = resolveDeltaTime(dt);
         const speed = car.speed || 0;
         const maxSpeed = car.maxSpeed || 1;
-        const forward = Math.max(0, speed / Math.max(maxSpeed, 1));
-        const speedReward = forward * 5.5 * dt;
-        const timePenalty = -0.5 * dt;
+        const forwardRatio = Math.max(0, speed / Math.max(maxSpeed, 1));
+        const forward = forwardRatio * 5.5 * delta;
+        const timePenalty = -0.5 * delta;
 
-        // Reverse penalty not yet implemented (tracked separately)
-        const reversePenalty = 0;
-
-        return {
-            forward: speedReward,
-            timePenalty,
-            reversePenalty
-        };
+        return { forward, timePenalty };
     };
 
     Game.prototype.computeManualSmoothDrivingReward = function computeManualSmoothDrivingReward(deltaTime) {
         const car = this.car;
         const tracker = this.manualReward;
-        const dt = typeof deltaTime === 'number' && deltaTime > 0 ? deltaTime : 0.016;
+        const dt = resolveDeltaTime(deltaTime);
 
         if (!car) {
             tracker.prevSteeringAngle = null;
