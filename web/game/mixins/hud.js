@@ -37,43 +37,18 @@ export function applyHudMixin(Game) {
         const cameraName = this.camera ? this.camera.getModeName() : "God's Eye View";
         const { createCard, createStatRow, createToggleRow, createDock, createDockButton } = window.UIKit;
 
-        const createSvgIcon = (segments = []) => {
-            const NS = 'http://www.w3.org/2000/svg';
-            const svg = document.createElementNS(NS, 'svg');
-            svg.setAttribute('viewBox', '0 0 24 24');
-            svg.setAttribute('aria-hidden', 'true');
-            svg.setAttribute('focusable', 'false');
-            svg.setAttribute('fill', 'none');
-            svg.setAttribute('stroke', 'currentColor');
-            svg.setAttribute('stroke-width', '1.8');
-            svg.setAttribute('stroke-linecap', 'round');
-            svg.setAttribute('stroke-linejoin', 'round');
-
-            segments.forEach((segment) => {
-                const tag = segment.tag || 'path';
-                const attrs = segment.attrs || { d: segment.d || segment };
-                const element = document.createElementNS(NS, tag);
-                Object.entries(attrs).forEach(([key, value]) => {
-                    element.setAttribute(key, value);
-                });
-                svg.appendChild(element);
-            });
-
-            return svg;
+        const createPngIcon = (iconName) => {
+            const img = document.createElement('img');
+            img.src = `ui/icons/${iconName}.png`;
+            img.alt = '';
+            img.width = 24;
+            img.height = 24;
+            img.setAttribute('aria-hidden', 'true');
+            img.setAttribute('focusable', 'false');
+            return img;
         };
 
-        const homeIcon = createSvgIcon([
-            { d: 'M3 11l9-7 9 7' },
-            { d: 'M5 10v10h14V10' },
-            { d: 'M9 21V12h6v9' }
-        ]);
-
-        const levelEditorIcon = createSvgIcon([
-            { d: 'M4 4h6v6H4z' },
-            { d: 'M14 4h6v6h-6z' },
-            { d: 'M4 14h6v6H4z' },
-            { d: 'M18.5 13.5l-5 5V21h2.5l5-5z' }
-        ]);
+        const toggleUIIcon = createPngIcon('eye-open');
 
         const hudCard = createCard({ title: 'Driver Console', overlay: true });
         hudCard.element.setAttribute('aria-label', 'Driver control panel');
@@ -148,6 +123,7 @@ export function applyHudMixin(Game) {
         let dockElementRef = null;
         let homeButtonRef = null;
         let levelEditorButtonRef = null;
+        let toggleUIButtonRef = null;
         let dockShouldDetach = false;
 
         const staticDock = document.getElementById('main-dock');
@@ -156,6 +132,7 @@ export function applyHudMixin(Game) {
             dockShouldDetach = false;
             homeButtonRef = staticDock.querySelector('[data-dock-action="home"]');
             levelEditorButtonRef = staticDock.querySelector('[data-dock-action="editor"]');
+            toggleUIButtonRef = staticDock.querySelector('[data-dock-action="toggle-ui"]');
 
             if (homeButtonRef) {
                 homeButtonRef.onclick = (event) => {
@@ -170,6 +147,13 @@ export function applyHudMixin(Game) {
                     openEditorModal();
                 };
             }
+
+            if (toggleUIButtonRef) {
+                toggleUIButtonRef.onclick = (event) => {
+                    event.preventDefault();
+                    this.toggleUI();
+                };
+            }
         } else {
             const dock = createDock({ label: 'Simulator dock' });
             const homeButton = createDockButton({
@@ -178,6 +162,14 @@ export function applyHudMixin(Game) {
                 icon: homeIcon,
                 onClick: () => {
                     window.location.href = '/';
+                }
+            });
+            const toggleUIButton = createDockButton({
+                label: 'Hide UI',
+                tooltip: 'Toggle UI visibility',
+                icon: toggleUIIcon,
+                onClick: () => {
+                    this.toggleUI();
                 }
             });
             const levelEditorButton = createDockButton({
@@ -189,13 +181,14 @@ export function applyHudMixin(Game) {
                 }
             });
 
-            dock.addMany([homeButton, levelEditorButton]);
+            dock.addMany([homeButton, toggleUIButton, levelEditorButton]);
             if (document.body) {
                 document.body.appendChild(dock.element);
             }
 
             dockElementRef = dock.element;
             homeButtonRef = homeButton.element;
+            toggleUIButtonRef = toggleUIButton.element;
             levelEditorButtonRef = levelEditorButton.element;
             dockShouldDetach = true;
         }
@@ -215,6 +208,7 @@ export function applyHudMixin(Game) {
             dock: {
                 element: dockElementRef,
                 homeButton: homeButtonRef,
+                toggleUIButton: toggleUIButtonRef,
                 levelEditorButton: levelEditorButtonRef,
                 detachOnReset: dockShouldDetach
             }
@@ -318,5 +312,49 @@ export function applyHudMixin(Game) {
         const milliseconds = Math.floor(ms % 1000);
 
         return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${milliseconds.toString().padStart(3, '0')}`;
+    };
+
+    Game.prototype.toggleUI = function toggleUI() {
+        if (!this.uiElements) {
+            return;
+        }
+
+        // Initialize UI visibility state if not set
+        if (this.uiVisible === undefined) {
+            this.uiVisible = true;
+        }
+
+        // Toggle visibility state
+        this.uiVisible = !this.uiVisible;
+
+        // Hide/show UI elements
+        const elementsToToggle = [this.uiElements.hudCard, this.uiElements.lapCard];
+        elementsToToggle.forEach(card => {
+            if (card && card.element) {
+                if (this.uiVisible) {
+                    card.element.style.display = '';
+                } else {
+                    card.element.style.display = 'none';
+                }
+            }
+        });
+
+        // Update toggle button icon and label
+        const toggleButton = this.uiElements.dock.toggleUIButton;
+        if (toggleButton) {
+            const iconImg = toggleButton.querySelector('img');
+            const labelSpan = toggleButton.querySelector('.ui-dock__label');
+            const tooltipSpan = toggleButton.querySelector('.ui-dock__tooltip');
+
+            if (iconImg) {
+                iconImg.src = this.uiVisible ? 'ui/icons/eye-open.png' : 'ui/icons/eye-close.png';
+            }
+            if (labelSpan) {
+                labelSpan.textContent = this.uiVisible ? 'Hide UI' : 'Show UI';
+            }
+            if (tooltipSpan) {
+                tooltipSpan.textContent = this.uiVisible ? 'Hide UI' : 'Show UI';
+            }
+        }
     };
 }
