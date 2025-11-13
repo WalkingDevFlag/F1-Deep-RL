@@ -3,6 +3,7 @@ import { applyEventMixin } from './mixins/events.js';
 import { applyHudMixin } from './mixins/hud.js';
 import { applyLapTimingMixin } from './mixins/lapTiming.js';
 import { applyLoopMixin } from './mixins/loop.js';
+import { applyManualRewardMixin } from './mixins/manualReward.js';
 import { applyNeuralOverlayMixin } from './mixins/neuralOverlay.js';
 
 class Game {
@@ -28,28 +29,30 @@ class Game {
         this.lastFrameTime = performance.now();
         this.deltaTime = 0;
         this.neuralNetworkVisible = false;
-    this.neuralOverlay = null;
+        this.neuralOverlay = null;
         this.uiElements = {};
 
         this.lapCount = 0;
         this.lapStartTime = null;
         this.currentLapTime = 0;
         this.carHasStartedMoving = false;
-    this.collisionTime = null;
-    this.lastCarPosition = { x: 0, y: 0 };
-    this.hasPassedStartLine = false;
-    this.pendingLapDisqualification = false;
-    this.lastLapTimeMs = null;
-    this.lapStatsDirty = false;
-    this.lapStatsFlushHandle = null;
-    this.lapStatsLastPersistTime = 0;
-    this.lapStatsUnloadHandlerRegistered = false;
-    this._lapStatsUnloadHandler = null;
-    this.lapStats = typeof this.loadLapStats === 'function' ? this.loadLapStats() : { tracks: {} };
+        this.collisionTime = null;
+        this.lastCarPosition = { x: 0, y: 0 };
+        this.hasPassedStartLine = false;
+        this.pendingLapDisqualification = false;
+        this.lastLapTimeMs = null;
+        this.lapStatsDirty = false;
+        this.lapStatsFlushHandle = null;
+        this.lapStatsLastPersistTime = 0;
+        this.lapStatsUnloadHandlerRegistered = false;
+        this._lapStatsUnloadHandler = null;
+        this.lapStats = typeof this.loadLapStats === 'function' ? this.loadLapStats() : { tracks: {} };
 
         this.trainingController = typeof window.TrainingController === 'function'
             ? new window.TrainingController(this)
             : null;
+
+        this.initializeManualRewardTracking();
 
         this.loop = this.loop.bind(this);
         this.initializeNeuralOverlay();
@@ -59,6 +62,7 @@ class Game {
 applyInitializationMixin(Game);
 applyEventMixin(Game);
 applyNeuralOverlayMixin(Game);
+applyManualRewardMixin(Game);
 applyHudMixin(Game);
 applyLapTimingMixin(Game);
 applyLoopMixin(Game);

@@ -114,8 +114,9 @@ export function applyHudMixin(Game) {
 
         const lapTimeRow = createStatRow({ label: 'Lap Time', value: '00:00:000' });
         const lapCountRow = createStatRow({ label: 'Laps', value: '0' });
+        const manualRewardRow = createStatRow({ label: 'Episode Reward', value: '0.00' });
 
-        lapCard.addMany([lapTimeRow, lapCountRow]);
+        lapCard.addMany([lapTimeRow, lapCountRow, manualRewardRow]);
         if (document.body) {
             document.body.appendChild(lapCard.element);
         }
@@ -205,6 +206,7 @@ export function applyHudMixin(Game) {
             lapCard,
             lapTimeRow,
             lapCountRow,
+            manualRewardRow,
             dock: {
                 element: dockElementRef,
                 homeButton: homeButtonRef,
@@ -302,6 +304,22 @@ export function applyHudMixin(Game) {
 
         if (this.uiElements.lapCountRow && typeof this.uiElements.lapCountRow.setValue === 'function') {
             this.uiElements.lapCountRow.setValue(this.lapCount.toString());
+        }
+
+        if (this.uiElements.manualRewardRow && typeof this.uiElements.manualRewardRow.setValue === 'function') {
+            const tracker = this.manualReward;
+            const trainingActive = this.trainingController
+                && typeof this.trainingController.isActive === 'function'
+                ? this.trainingController.isActive()
+                : false;
+
+            if (trainingActive) {
+                this.uiElements.manualRewardRow.setValue('--');
+            } else if (tracker && Number.isFinite(tracker.total)) {
+                this.uiElements.manualRewardRow.setValue(tracker.total.toFixed(2));
+            } else {
+                this.uiElements.manualRewardRow.setValue('0.00');
+            }
         }
     };
 

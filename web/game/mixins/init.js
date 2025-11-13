@@ -26,6 +26,10 @@ export function applyInitializationMixin(Game) {
             const spawnPoint = await this.track.initialize();
             this.car.reset(spawnPoint);
 
+            if (typeof this.onManualTrackReady === 'function') {
+                this.onManualTrackReady();
+            }
+
             if (this.trainingController) {
                 this.trainingController.onTrackReady();
             }

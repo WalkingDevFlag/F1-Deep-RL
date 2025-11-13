@@ -16,6 +16,10 @@ export function applyLoopMixin(Game) {
             this.trainingController.handleFrame({ deltaTime: this.deltaTime });
         }
 
+        if (typeof this.updateManualReward === 'function') {
+            this.updateManualReward(this.deltaTime);
+        }
+
         if (this.car.damaged && !this.collisionResetTimeout) {
             console.log('Collision detected! Press R to reset. Auto-reset in 1.5s.');
             this.carHasStartedMoving = false;

@@ -223,6 +223,9 @@ export function applyLapTimingMixin(Game) {
     Game.prototype.resetCar = function resetCar() {
         const spawnPoint = this.track.getSpawnPoint();
         this.car.reset(spawnPoint);
+        if (typeof this.resetManualReward === 'function') {
+            this.resetManualReward();
+        }
         if (this.collisionResetTimeout) {
             clearTimeout(this.collisionResetTimeout);
             this.collisionResetTimeout = null;
