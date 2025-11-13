@@ -249,9 +249,7 @@ export function applyInteractionMixin(LevelEditor) {
                     
                     if (this.currentTool === 'delete') {
                         const toDelete = [...this.editorState.selectedCheckpoints];
-                        if (confirm(`Delete ${toDelete.length} checkpoint(s)?`)) {
-                            toDelete.forEach(id => this.deleteCheckpoint(id));
-                        }
+                        this.showCheckpointDeletionModal(toDelete);
                     }
                 }
                 this.render();

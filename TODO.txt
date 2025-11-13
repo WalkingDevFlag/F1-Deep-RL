@@ -30,11 +30,9 @@ Level Editor Upgrades/Fixes:
 4) Renderes a checkered Flag on the start and Finish
 5) Remove Test Drive Button
 6) Remove "Editing: Track Name" from Hud
-7) Change Overlay text to use Shiny Text As loading
-8) Make Overlay Darker
-9) Remove Select Button, Or Disable it for now ig, Has Functionality, like it does allow me to select and delete checkpoints and Edit or Resize them, but i want it happen without the button, so when im in Pan/Zoom and i select the checkpoint, can select multiple as well as delete as well as resize
-10) Modal Appears to confirm Deletion Action of Checkpoints, Dark Overlay same overlay that Loading track, Extracting Walls and Saving has , "Are you sure you want to delete this Checkpoint?" or "Are you sure you want to delete X Checkpoints?", bolden the word delete in both, 2 button Confirm and Cancel
-
+7) Remove Select Button, Or Disable it for now ig, Has Functionality, like it does allow me to select and delete checkpoints and Edit or Resize them, but i want it happen without the button, so when im in Pan/Zoom and i select the checkpoint, can select multiple as well as delete as well as resize
+8) Modal Appears to confirm Deletion Action of Checkpoints, Dark Overlay same overlay that Loading track, Extracting Walls and Saving has , "Are you sure you want to delete this Checkpoint?" or "Are you sure you want to delete X Checkpoints?", bolden the word delete in both, 2 button Confirm and Cancel
+9) If i have Checkpoints 1,2,3,4,5 and suppose i delete 2 then instead of 1,3,4,5 it should renumber itself to 1,2,3,4 ig
 
 
 Main Simulation Upgrades/Fixes:
@@ -48,18 +46,26 @@ Ai Training:
 2) Resume Training Logic ig
 3) Stylizing the Neural Net Visualiser
 4) Recording
-5) Currently when i start training, it saves after every 10,000 steps. I had trained for like 1,00,000 steps and realised that i was training on the wrong policies and now i deleted the checkpoints but after training the saved checkpoint was not 10,000 rather it was 1,10,000. Need Robust Resume Training/ Scratch Training Logic
+5) Need a Episode Reward Counter for Manual Driving as well to check mine as well
+
 
 Reward Policies:
 1) Adding a Penality if it crashes Very Early. Similar to lap logic, the Time it crashed is closer to 0 than the Avg Track Lap time, penalty
-2) 
-
+2) If it Stops Midway
+3) Spawn Camping
+4) Idle
+5) Are Rewards FPS Dependent?
 
 Bugs:
 web/levelEditor.js: setWallExtractionState calls this.showWallExtractionOverlay() (around the wall extraction toggle), but no such method exists anywhere in the editor mixins—invoking wall extraction currently explodes with a TypeError before any work is done.
 web/car.js: the boundary clamp still uses the constructor defaults (this.width/this.height) instead of the scaled sprite dimensions from setCarImage; the center is forced at least 32 px/16 px from the edges even if the actual car is wider, making the car feel like it hits invisible walls and still allowing rendered geometry to stick out.
 web/editor/persistence.js: setSavingState rewrites saveButton.textContent to “Saving…”/“Save”, stripping the SVG icon/label/tooltip elements permanently—after the first save the button loses all styling and accessibility structure.
 web/index.html: there is a duplicated ui-dock__items block (the level-editor tool buttons) dropped inside the script section along with stray </nav></div> closers; the page renders invalid DOM and those dead buttons sit in the document tree.
+server.py: upload_track checks file.content_length > 25 * 1024 * 1024, but FileStorage.content_length is often None. In that case the comparison throws and every upload returns 500. Guard with if file.content_length and file.content_length > ... or fall back to request.content_length instead.
+server.py: create_track_folder always writes a canonical.png, even when the user uploads .jpg/.svg. The copied data keeps the original format but now has a .png extension, so browsers fail to render the track art (and the default loader breaks). Either convert to PNG or keep the correct extension in both metadata and filename.
+trainingController.js: togglePause unpauses by forcing game.lapStartTime = performance.now() - this.pausedElapsedLapTime even when no lap timer was running. Pausing before the first lap (or after a reset) restarts with a fabricated lap start, corrupting lap timing and rewards. Only set lapStartTime when it was non-null going into the pause.
+trainingController.js: updateStatsDisplay keeps using performance.now() - this.trainingStartTime while paused, so the “Time Elapsed” counter drifts instead of freezing. Reuse the cached pausedElapsedTrainingTime when isPaused is true to keep the UI consistent with the paused state.
+
 
 Optimizations:
 car.js: extractCarPolygon runs a full image scan on every load (nested loops + neighbor checks across every pixel) producing thousands of points; consider precomputing a simplified outline or using a marching-squares style contour to avoid heavy per-frame transforms and collision checks with oversized polygons.
