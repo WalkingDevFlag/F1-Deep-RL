@@ -7,3 +7,4 @@ eventlet
 tensorboard
 pytest
 stable-baselines3
+livereload

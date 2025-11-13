@@ -3,6 +3,7 @@ Things to add:
 2) Full Body Sensors
 6) Add unit tests
 4) Adding Sound, Sound Toggle as well
+5) 
 
 Monitoring, logging, and checkpoints
 1) Fix Path outputs for model checkpoints and zip files
@@ -31,14 +32,14 @@ Level Editor Upgrades/Fixes:
 5) Remove Test Drive Button
 6) Remove "Editing: Track Name" from Hud
 7) Remove Select Button, Or Disable it for now ig, Has Functionality, like it does allow me to select and delete checkpoints and Edit or Resize them, but i want it happen without the button, so when im in Pan/Zoom and i select the checkpoint, can select multiple as well as delete as well as resize
-8) Modal Appears to confirm Deletion Action of Checkpoints, Dark Overlay same overlay that Loading track, Extracting Walls and Saving has , "Are you sure you want to delete this Checkpoint?" or "Are you sure you want to delete X Checkpoints?", bolden the word delete in both, 2 button Confirm and Cancel
 9) If i have Checkpoints 1,2,3,4,5 and suppose i delete 2 then instead of 1,3,4,5 it should renumber itself to 1,2,3,4 ig
 
 
 Main Simulation Upgrades/Fixes:
 1) Adding a Auto Drive on Full Speed for Car, no AI. Calculates mid of the whole track and drives on that mid line, will press on W key and W + A and W + D
 2) Fix the Issue/Bug when i change the camera perspective from God's Eye to Car Cam, it Plummets down from 165 to 11 fps......Need to Find and Fix the Bug, Still think its cuz of the Track Size
-3) 
+3) Hide Button Also Hides the Training UI as well
+4) 
 
 
 Ai Training:

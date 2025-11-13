@@ -14,6 +14,8 @@ import numpy as np
 
 from training import DQNTrainer, TrainingConfig, available_agents
 
+from livereload import Server
+
 app = Flask(__name__)
 
 logging.basicConfig(level=os.environ.get("TRAINER_LOG_LEVEL", "INFO"))
@@ -647,4 +649,8 @@ if __name__ == '__main__':
     # (Flask debug mode spawns a reloader that would open a second tab)
     if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
         _open_browser_later(url, delay=1.5)
-    app.run(host=host, port=port, debug=True)
+    
+    # Use livereload for live updates
+    server = Server(app.wsgi_app)
+    server.watch('../web/', delay=1)
+    server.serve(host=host, port=port)
