@@ -39,7 +39,7 @@ Main Simulation Upgrades/Fixes:
 1) Adding a Auto Drive on Full Speed for Car, no AI. Calculates mid of the whole track and drives on that mid line, will press on W key and W + A and W + D
 2) Fix the Issue/Bug when i change the camera perspective from God's Eye to Car Cam, it Plummets down from 165 to 11 fps......Need to Find and Fix the Bug, Still think its cuz of the Track Size
 3) Hide Button Also Hides the Training UI as well
-4) 
+4)
 
 
 Ai Training:
@@ -53,9 +53,10 @@ Ai Training:
 Reward Policies:
 1) Adding a Penality if it crashes Very Early. Similar to lap logic, the Time it crashed is closer to 0 than the Avg Track Lap time, penalty
 2) If it Stops Midway
-3) Spawn Camping
+3) Spawn Camping [True]
 4) Idle
 5) Are Rewards FPS Dependent?
+6) No Reverse Penalty, need to add that
 
 Bugs:
 web/levelEditor.js: setWallExtractionState calls this.showWallExtractionOverlay() (around the wall extraction toggle), but no such method exists anywhere in the editor mixins—invoking wall extraction currently explodes with a TypeError before any work is done.

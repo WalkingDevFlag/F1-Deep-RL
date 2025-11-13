@@ -87,6 +87,11 @@ export function applyManualRewardMixin(Game) {
             return;
         }
 
+        // Stop accumulating reward after collision, like the lap timer
+        if (this.car.damaged) {
+            return;
+        }
+
         const tracker = this.manualReward;
         const metrics = this.computeManualCheckpointMetrics();
 
