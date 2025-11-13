@@ -4,6 +4,7 @@ const MANUAL_POLICY_LABELS = {
     lapCompletion: 'Lap completion bonus',
     forwardSpeed: 'Forward speed reward',
     timePenalty: 'Time penalty',
+    reversePenalty: 'Reverse-speed penalty',
     headingStability: 'Heading stability reward',
     collisionPenalty: 'Collision penalty',
     stalledPenalty: 'Idle/stall penalty',
@@ -12,6 +13,12 @@ const MANUAL_POLICY_LABELS = {
 
 const MANUAL_POLICY_KEYS = Object.keys(MANUAL_POLICY_LABELS);
 const DEFAULT_DT = 0.016;
+
+const SPEED_CONFIG = {
+    forwardScale: 5.5,
+    timePenaltyScale: -0.5,
+    reversePenaltyScale: -6
+};
 
 const INACTIVITY_CONFIG = {
     speedThreshold: 2,
@@ -219,9 +226,11 @@ export function applyManualRewardMixin(Game) {
         const speedComponents = this.computeManualSpeedComponents(dt);
         contributions.forwardSpeed = speedComponents.forward;
         contributions.timePenalty = speedComponents.timePenalty;
+        contributions.reversePenalty = speedComponents.reversePenalty;
         policyImplemented.forwardSpeed = true;
         policyImplemented.timePenalty = true;
-        reward += speedComponents.forward + speedComponents.timePenalty;
+        policyImplemented.reversePenalty = true;
+        reward += speedComponents.forward + speedComponents.timePenalty + speedComponents.reversePenalty;
 
         const headingReward = this.computeManualSmoothDrivingReward(dt);
         contributions.headingStability = headingReward;
@@ -375,17 +384,19 @@ export function applyManualRewardMixin(Game) {
     Game.prototype.computeManualSpeedComponents = function computeManualSpeedComponents(dt) {
         const car = this.car;
         if (!car) {
-            return { forward: 0, timePenalty: 0 };
+            return { forward: 0, timePenalty: 0, reversePenalty: 0 };
         }
 
         const delta = resolveDeltaTime(dt);
         const speed = car.speed || 0;
         const maxSpeed = car.maxSpeed || 1;
         const forwardRatio = Math.max(0, speed / Math.max(maxSpeed, 1));
-        const forward = forwardRatio * 5.5 * delta;
-        const timePenalty = -0.5 * delta;
+        const forward = forwardRatio * SPEED_CONFIG.forwardScale * delta;
+        const timePenalty = SPEED_CONFIG.timePenaltyScale * delta;
+        const reverseRatio = Math.max(0, -speed / Math.max(maxSpeed, 1));
+        const reversePenalty = reverseRatio * SPEED_CONFIG.reversePenaltyScale * delta;
 
-        return { forward, timePenalty };
+        return { forward, timePenalty, reversePenalty };
     };
 
     Game.prototype.computeManualSmoothDrivingReward = function computeManualSmoothDrivingReward(deltaTime) {

@@ -8,6 +8,12 @@
         return DEFAULT_DT;
     };
 
+    const SPEED_CONFIG = {
+        forwardScale: 5.5,
+        timePenaltyScale: -0.5,
+        reversePenaltyScale: -6
+    };
+
     const INACTIVITY_CONFIG = {
         speedThreshold: 2,
         progressThreshold: 0.0005,
@@ -656,13 +662,15 @@
                 this.prevSteeringAngle = null;
                 return 0;
             }
-            const dt = typeof deltaTime === 'number' && deltaTime > 0 ? deltaTime : 0.016;
+            const dt = resolveDeltaTime(deltaTime);
             const speed = car.speed || 0;
             const maxSpeed = car.maxSpeed || 1;
-            const forward = Math.max(0, speed / maxSpeed);
-            const speedReward = forward * 5.5 * dt;
-            const timePenalty = -0.5 * dt;
-            return speedReward + timePenalty;
+            const forwardRatio = Math.max(0, speed / Math.max(maxSpeed, 1));
+            const speedReward = forwardRatio * SPEED_CONFIG.forwardScale * dt;
+            const timePenalty = SPEED_CONFIG.timePenaltyScale * dt;
+            const reverseRatio = Math.max(0, -speed / Math.max(maxSpeed, 1));
+            const reversePenalty = reverseRatio * SPEED_CONFIG.reversePenaltyScale * dt;
+            return speedReward + timePenalty + reversePenalty;
         }
 
         computeSmoothDrivingReward(deltaTime) {
