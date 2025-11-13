@@ -39,7 +39,7 @@ Main Simulation Upgrades/Fixes:
 1) Adding a Auto Drive on Full Speed for Car, no AI. Calculates mid of the whole track and drives on that mid line, will press on W key and W + A and W + D
 2) Fix the Issue/Bug when i change the camera perspective from God's Eye to Car Cam, it Plummets down from 165 to 11 fps......Need to Find and Fix the Bug, Still think its cuz of the Track Size
 3) Hide Button Also Hides the Training UI as well
-4)
+4) Manual Episode Reward: implement reverse-speed, steering-change, and stuck penalties (runtime warns when missing)
 
 
 Ai Training:
@@ -48,6 +48,7 @@ Ai Training:
 3) Stylizing the Neural Net Visualiser
 4) Recording
 5) Reposition the Training Control card so it does not overlap other HUD elements
+6) Model logging
 
 
 Reward Policies:
