@@ -59,7 +59,7 @@ canvas#canvas {
 
 .ui-card.training-card {
     position: absolute;
-    top: 230px;
+    top: 280px;
     right: 20px !important;
     left: auto !important;
     z-index: 10;

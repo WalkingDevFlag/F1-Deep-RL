@@ -47,8 +47,7 @@ Ai Training:
 2) Resume Training Logic ig
 3) Stylizing the Neural Net Visualiser
 4) Recording
-5) Reposition the Training Control card so it does not overlap other HUD elements
-6) Model logging
+5) Model logging
 
 
 Reward Policies:
