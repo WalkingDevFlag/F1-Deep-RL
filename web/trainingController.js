@@ -73,6 +73,8 @@
             this.pausedElapsedLapTime = 0;
             this.spawnPoint = null;
             this.inactivityState = createInactivityState();
+            this.currentEpsilon = 0.0;
+            this.currentSteps = 0;
         }
 
         async attachUI() {
@@ -149,6 +151,8 @@
             const timeElapsedRow = this.createStatRow('Time Elapsed', '00:00:00');
             const resetCountRow = this.createStatRow('Reset Count', '0');
             const episodeRewardRow = this.createStatRow('Episode Reward', '0.00');
+            const epsilonRow = this.createStatRow('Epsilon', '0.00');
+            const stepsRow = this.createStatRow('Steps', '0');
 
             const pauseButton = document.createElement('button');
             pauseButton.type = 'button';
@@ -162,13 +166,15 @@
             statsCard.add(timeElapsedRow);
             statsCard.add(resetCountRow);
             statsCard.add(episodeRewardRow);
+            statsCard.add(epsilonRow);
+            statsCard.add(stepsRow);
             statsCard.add(pauseButton);
 
             document.body.appendChild(statsCard.element);
 
             this.ui = {
                 card, select, button, status,
-                statsCard, timeElapsed: timeElapsedRow, resetCount: resetCountRow, episodeReward: episodeRewardRow, pauseButton
+                statsCard, timeElapsed: timeElapsedRow, resetCount: resetCountRow, episodeReward: episodeRewardRow, epsilon: epsilonRow, steps: stepsRow, pauseButton
             };
             this.updateUIState();
         }
@@ -326,6 +332,8 @@
                 this.isPaused = false;
                 this.pausedElapsedTrainingTime = 0;
                 this.pausedElapsedLapTime = 0;
+                this.currentEpsilon = 0.0;
+                this.currentSteps = 0;
                 this.inactivityState = createInactivityState();
                 this.updateStatus('Running');
             } catch (error) {
@@ -369,6 +377,8 @@
                 this.isPaused = false;
                 this.pausedElapsedTrainingTime = 0;
                 this.pausedElapsedLapTime = 0;
+                this.currentEpsilon = 0.0;
+                this.currentSteps = 0;
                 this.inactivityState = createInactivityState();
                 this.updateStatus('Idle');
                 this.setUIBusy(false);
@@ -542,6 +552,14 @@
 
             if (typeof data.action === 'number') {
                 this.currentAction = data.action;
+            }
+
+            // Update stats from server response
+            if (typeof data.epsilon === 'number') {
+                this.currentEpsilon = data.epsilon;
+            }
+            if (typeof data.total_steps === 'number') {
+                this.currentSteps = data.total_steps;
             }
 
             if (wantsSnapshot && data && typeof data.network_snapshot === 'object') {
@@ -821,7 +839,7 @@
         }
 
         updateStatsDisplay() {
-            if (!this.ui.timeElapsed || !this.ui.resetCount || !this.ui.episodeReward) {
+            if (!this.ui.timeElapsed || !this.ui.resetCount || !this.ui.episodeReward || !this.ui.epsilon || !this.ui.steps) {
                 return;
             }
 
@@ -842,6 +860,12 @@
 
             // Update episode reward (running total for the current episode)
             this.ui.episodeReward.setValue(this.totalReward.toFixed(2));
+
+            // Update epsilon
+            this.ui.epsilon.setValue(this.currentEpsilon.toFixed(3));
+
+            // Update steps
+            this.ui.steps.setValue(this.currentSteps.toString());
         }
 
         scheduleAutoReset() {
