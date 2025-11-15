@@ -41,6 +41,7 @@ Main Simulation Upgrades/Fixes:
 3) Hide Button Also Hides the Training UI as well
 4) Manual Episode Reward: implement reverse-speed, steering-change, and stuck penalties (runtime warns when missing)
 5) 720p + 1080p track Resolution henceforth
+6) Car Size Scaling, 0.4 for Albert Melbourne Park
 
 Ai Training:
 1) Button To let the Latest Trained AI Takeover and Drive

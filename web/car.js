@@ -17,7 +17,7 @@ class Car {
         this.sensorsEnabled = true;
         this.trackImg = trackImg;
         this.offscreenCtx = offscreenCtx;
-        this.carImgScale = 0.2; // The scale factor used when drawing the car image
+        this.carImgScale = 0.05; // The scale factor used when drawing the car image
         this.actualWidth = width;
         this.actualHeight = height;
         this.carPolygon = []; // Will be set when car image is loaded
