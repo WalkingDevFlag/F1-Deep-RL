@@ -962,9 +962,10 @@
             this.prevDamaged = false;
             this.prevSteeringAngle = this.game.car ? this.game.car.angle || 0 : 0;
             this.collisionSinceLastLap = false;
-            if (this.enabled && !this.pendingAutoReset) {
-                // Mark manual resets so the trainer can start a fresh episode without mixing done + reset frames.
-                this.resetFlag = true;
+
+            if (this.enabled) {
+                // Only send a reset to the trainer when initiated manually.
+                this.resetFlag = !this.pendingAutoReset;
                 this.previousStateVector = null;
                 this.prevProgressWithinLap = 0;
                 this.checkpointState.totalCleared = 0;
@@ -974,7 +975,10 @@
                 this.currentReward = 0;
                 this.totalReward = 0;
                 this.updateStatsDisplay();
+            } else {
+                this.resetFlag = false;
             }
+
             this.inactivityState = createInactivityState();
         }
     }
