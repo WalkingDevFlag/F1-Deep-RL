@@ -55,6 +55,31 @@ client_logger.handlers.clear()
 client_logger.addHandler(client_handler)
 client_logger.propagate = False
 
+# Reward-specific logging -------------------------------------------------
+REWARD_LOG_PATH = os.path.join(LOG_DIR, "reward.log")
+reward_handler = logging.FileHandler(REWARD_LOG_PATH, encoding="utf-8")
+reward_handler.setFormatter(formatter)
+
+
+class RewardFilter(logging.Filter):
+    """Capture reward-related logs from both trainer and mirrored client console output."""
+
+    def filter(self, record: logging.LogRecord) -> bool:  # pragma: no cover - simple filter
+        try:
+            name = record.name or ""
+            if name.startswith("training.reward"):
+                return True
+            message = record.getMessage()
+            if isinstance(message, str) and ("REWARD_STEP" in message or "REWARD_EPISODE" in message):
+                return True
+        except Exception:
+            return False
+        return False
+
+
+reward_handler.addFilter(RewardFilter())
+root_logger.addHandler(reward_handler)
+
 logger = logging.getLogger(__name__)
 
 
