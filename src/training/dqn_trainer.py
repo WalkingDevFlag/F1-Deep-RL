@@ -547,8 +547,8 @@ class DQNTrainer:
         logger.debug("Target network synchronised at step %s", self.total_steps)
 
     def _update_epsilon(self) -> None:
+        # Only decay epsilon while the trainer is actively running episodes.
         if not self.running:
-            self.epsilon = max(self.config.end_epsilon, self.epsilon * 0.995)
             return
 
         decay_ratio = min(1.0, self.total_steps / max(1, self.config.epsilon_decay_steps))
