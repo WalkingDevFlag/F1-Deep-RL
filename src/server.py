@@ -18,8 +18,74 @@ from livereload import Server
 
 app = Flask(__name__)
 
-logging.basicConfig(level=os.environ.get("TRAINER_LOG_LEVEL", "INFO"))
+LOG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Logs"))
+os.makedirs(LOG_DIR, exist_ok=True)
+TRAINER_LOG_PATH = os.path.join(LOG_DIR, "trainer.log")
+CLIENT_LOG_PATH = os.path.join(LOG_DIR, "client.log")
+LOG_LEVEL = os.environ.get("TRAINER_LOG_LEVEL", "INFO")
+LOG_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+
+
+class TrainerLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:  # pragma: no cover - simple filter
+        name = record.name or ""
+        return name.startswith("training") or name.startswith("server") or name.startswith("__main__")
+
+
+root_logger = logging.getLogger()
+root_logger.setLevel(LOG_LEVEL)
+root_logger.handlers.clear()
+
+formatter = logging.Formatter(LOG_FORMAT)
+
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(formatter)
+root_logger.addHandler(stream_handler)
+
+trainer_handler = logging.FileHandler(TRAINER_LOG_PATH, encoding="utf-8")
+trainer_handler.setFormatter(formatter)
+trainer_handler.addFilter(TrainerLogFilter())
+root_logger.addHandler(trainer_handler)
+
+client_logger = logging.getLogger("client_log")
+client_logger.setLevel(LOG_LEVEL)
+client_handler = logging.FileHandler(CLIENT_LOG_PATH, encoding="utf-8")
+client_handler.setFormatter(formatter)
+client_logger.handlers.clear()
+client_logger.addHandler(client_handler)
+client_logger.propagate = False
+
 logger = logging.getLogger(__name__)
+
+
+@app.route('/training/client-log', methods=['POST'])
+def training_client_log():
+    payload = request.get_json(silent=True) or {}
+    level = str(payload.get('level', 'info')).lower()
+    messages = payload.get('messages') or []
+
+    parts = []
+    for item in messages:
+        if isinstance(item, str):
+            parts.append(item)
+        else:
+            try:
+                parts.append(json.dumps(item, separators=(',', ':'), ensure_ascii=True))
+            except (TypeError, ValueError):
+                parts.append(str(item))
+
+    message = ' '.join(parts) if parts else payload.get('message', '')
+    level_map = {
+        'debug': client_logger.debug,
+        'info': client_logger.info,
+        'log': client_logger.info,
+        'warn': client_logger.warning,
+        'warning': client_logger.warning,
+        'error': client_logger.error,
+    }
+    log_method = level_map.get(level, client_logger.info)
+    log_method(message)
+    return ('', 204)
 
 
 class TrainerService:
@@ -146,6 +212,8 @@ TRAINING_CONFIG = TrainingConfig(
     target_update_frequency=1_000,
     save_every_steps=5_000,
     max_training_steps=1_000_000,
+    resume_mode="fresh",
+    single_run_mode=True,
 )
 
 trainer_service = TrainerService(TRAINING_CONFIG)

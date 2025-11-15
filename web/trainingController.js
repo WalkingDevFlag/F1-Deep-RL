@@ -1,5 +1,64 @@
 (function (global) {
     const DEFAULT_DT = 0.016;
+    const CONSOLE_METHODS = ['log', 'info', 'warn', 'error'];
+    const CLIENT_LOG_ENDPOINT = '/training/client-log';
+
+    const attachConsoleMirroring = () => {
+        if (!global || global.__trainingConsoleMirrored) {
+            return;
+        }
+
+        const consoleRef = global.console;
+        if (!consoleRef) {
+            return;
+        }
+
+        const serialiseArgument = (value) => {
+            if (typeof value === 'string') {
+                return value;
+            }
+            try {
+                return JSON.stringify(value);
+            } catch (error) {
+                return String(value);
+            }
+        };
+
+        const sendToServer = (level, args) => {
+            try {
+                const payload = {
+                    level,
+                    messages: args.map(serialiseArgument),
+                    timestamp: Date.now(),
+                };
+                if (typeof global.fetch === 'function') {
+                    global.fetch(CLIENT_LOG_ENDPOINT, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                        keepalive: true,
+                    }).catch(() => {});
+                }
+            } catch (error) {
+                // Swallow log transport errors
+            }
+        };
+
+        CONSOLE_METHODS.forEach((method) => {
+            const original = consoleRef[method];
+            if (typeof original !== 'function') {
+                return;
+            }
+            consoleRef[method] = function patchedConsoleMethod(...args) {
+                original.apply(consoleRef, args);
+                sendToServer(method, args);
+            };
+        });
+
+        global.__trainingConsoleMirrored = true;
+    };
+
+    attachConsoleMirroring();
 
     const resolveDeltaTime = (deltaTime) => {
         if (typeof deltaTime === 'number' && Number.isFinite(deltaTime) && deltaTime > 0) {

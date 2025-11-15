@@ -29,21 +29,22 @@ class TrainingConfig:
     learning_rate: float = 1e-4
     train_frequency: int = 4
     target_update_frequency: int = 1_000
-    start_epsilon: float = 1.0
+    start_epsilon: float = 0.1
     end_epsilon: float = 0.05
-    epsilon_decay_steps: int = 50_000
+    epsilon_decay_steps: int = 10_000
     save_every_steps: int = 10_000
     max_training_steps: int = 500_000
     min_replay_size: int = 1_000
-    device: str = "cpu"
+    device: str = "auto"
     checkpoint_dir: Optional[str] = None
     seed: Optional[int] = None
     resume_mode: str = "auto"  # one of {auto, fresh, resume}
     run_id: Optional[str] = None
     policy_version: str = "default"
     policy_signature: Optional[str] = None
-    run_subdir: str = "runs"
+    run_subdir: str = ""
     manifest_filename: str = "manifest.json"
+    single_run_mode: bool = True
 
     def __post_init__(self) -> None:
         if self.checkpoint_dir is None:
@@ -71,6 +72,12 @@ class TrainingConfig:
             raise ValueError("run_subdir should be a single directory name")
         if not self.manifest_filename.endswith(".json"):
             raise ValueError("manifest_filename must be a JSON file name")
+
+        if not isinstance(self.single_run_mode, bool):
+            raise TypeError("single_run_mode must be a boolean")
+
+        if self.device == "auto":
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
 
 class ReplayBuffer:
@@ -115,6 +122,7 @@ class RunManager:
         policy_version: str,
         config_fingerprint: str,
         policy_signature: Optional[str] = None,
+        single_run: bool = False,
     ) -> None:
         self._base_dir = Path(base_dir)
         self._resume_mode = resume_mode
@@ -123,6 +131,7 @@ class RunManager:
         self._policy_version = policy_version
         self._policy_signature = policy_signature
         self._config_fingerprint = config_fingerprint
+        self._single_run = bool(single_run)
 
         self.run_id: Optional[str] = None
         self.run_dir: Optional[Path] = None
@@ -175,6 +184,10 @@ class RunManager:
     def _initialise(self) -> None:
         self._base_dir.mkdir(parents=True, exist_ok=True)
 
+        if self._single_run:
+            self._initialise_single_run()
+            return
+
         if self._resume_mode == "fresh":
             self._start_new_run()
             return
@@ -194,6 +207,57 @@ class RunManager:
                 pass
         self._start_new_run()
 
+    def _initialise_single_run(self) -> None:
+        manifest_path = self._base_dir / self._manifest_name if self._manifest_name else None
+
+        self.run_id = "session"
+        self.run_dir = self._base_dir
+        self.manifest_path = manifest_path
+
+        if self._resume_mode == "fresh" and manifest_path and manifest_path.exists():
+            manifest_path.unlink()
+
+        if manifest_path and manifest_path.exists() and self._resume_mode != "fresh":
+            with manifest_path.open("r", encoding="utf-8") as handle:
+                manifest = json.load(handle)
+
+            stored_fingerprint = manifest.get("config_fingerprint")
+            stored_policy_version = manifest.get("policy_version")
+            stored_signature = manifest.get("policy_signature")
+
+            if stored_fingerprint != self._config_fingerprint or stored_policy_version != self._policy_version:
+                if manifest_path and manifest_path.exists():
+                    manifest_path.unlink()
+                self._create_new_manifest()
+                return
+
+            if self._policy_signature and stored_signature != self._policy_signature:
+                if manifest_path and manifest_path.exists():
+                    manifest_path.unlink()
+                self._create_new_manifest()
+                return
+
+            self.manifest = manifest
+            self.resumed = True
+        else:
+            self._create_new_manifest()
+
+    def _create_new_manifest(self) -> None:
+        self.resumed = False
+        self.manifest = {
+            "run_id": self.run_id or "session",
+            "created_at": self._utc_now(),
+            "policy_version": self._policy_version,
+            "policy_signature": self._policy_signature,
+            "config_fingerprint": self._config_fingerprint,
+            "total_steps": 0,
+            "training_steps": 0,
+            "checkpoints": [],
+            "updated_at": self._utc_now(),
+        }
+        if self.manifest_path:
+            self._write_manifest()
+
     def _start_new_run(self) -> None:
         base_run_id = self._requested_run_id or f"run_{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
         run_id = base_run_id
@@ -212,18 +276,7 @@ class RunManager:
         self.manifest_path = manifest_path
         self.resumed = False
 
-        self.manifest = {
-            "run_id": run_id,
-            "created_at": self._utc_now(),
-            "policy_version": self._policy_version,
-            "policy_signature": self._policy_signature,
-            "config_fingerprint": self._config_fingerprint,
-            "total_steps": 0,
-            "training_steps": 0,
-            "checkpoints": [],
-            "updated_at": self._utc_now(),
-        }
-        self._write_manifest()
+        self._create_new_manifest()
 
     def _load_existing_run(self, run_id: str) -> None:
         run_dir = self._base_dir / run_id
@@ -300,6 +353,7 @@ class DQNTrainer:
             torch.manual_seed(config.seed)
 
         self.device = torch.device(config.device)
+        logger.info("Initialising DQNTrainer on device %s", self.device)
         self.policy_net = DQNNetwork(config.state_size, config.action_size).to(self.device)
         self.target_net = DQNNetwork(config.state_size, config.action_size).to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
@@ -316,6 +370,7 @@ class DQNTrainer:
         self.last_episode_return = 0.0
         self.current_episode_return = 0.0
         self.current_episode_length = 0
+        self._max_steps_notice_emitted = False
 
         self._config_fingerprint = self._compute_config_fingerprint()
         self._run_manager = None
@@ -378,8 +433,12 @@ class DQNTrainer:
             if self.total_steps % self.config.save_every_steps == 0:
                 self._save_checkpoint_async()
             if self.total_steps >= self.config.max_training_steps:
-                logger.info("Maximum training steps reached; stopping trainer")
-                self.stop()
+                if not self._max_steps_notice_emitted:
+                    logger.info(
+                        "Maximum training steps reached (%s); continuing until manual stop",
+                        self.config.max_training_steps,
+                    )
+                    self._max_steps_notice_emitted = True
 
         self._update_epsilon()
 
@@ -390,7 +449,9 @@ class DQNTrainer:
 
     # ------------------------------------------------------------------
     def _initialise_run_state(self) -> None:
-        run_root = Path(self.config.checkpoint_dir) / self.config.run_subdir
+        run_root = Path(self.config.checkpoint_dir)
+        if not self.config.single_run_mode and self.config.run_subdir:
+            run_root = run_root / self.config.run_subdir
         manager = RunManager(
             base_dir=str(run_root),
             resume_mode=self.config.resume_mode,
@@ -399,6 +460,7 @@ class DQNTrainer:
             policy_version=self.config.policy_version,
             config_fingerprint=self._config_fingerprint,
             policy_signature=self.config.policy_signature,
+            single_run=self.config.single_run_mode,
         )
 
         self._run_manager = manager
@@ -538,6 +600,7 @@ class DQNTrainer:
             "running": self.running,
             "epsilon": self.epsilon,
             "total_steps": self.total_steps,
+            "steps": self.total_steps,
             "training_steps": self.training_steps,
             "buffer_size": len(self.replay_buffer),
             "last_episode_return": self.last_episode_return,
@@ -545,6 +608,7 @@ class DQNTrainer:
             "current_episode_length": self.current_episode_length,
             "run_id": self._run_id,
             "run_directory": str(self._run_dir) if self._run_dir else None,
+            "device": str(self.device),
         }
 
     def load_checkpoint(self, path: str) -> None:
