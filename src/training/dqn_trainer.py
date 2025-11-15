@@ -15,6 +15,8 @@ from datetime import datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+# Dedicated reward logger
+reward_logger = logging.getLogger("training.reward")
 
 
 @dataclass
@@ -29,12 +31,12 @@ class TrainingConfig:
     learning_rate: float = 1e-4
     train_frequency: int = 4
     target_update_frequency: int = 1_000
-    start_epsilon: float = 0.3
+    start_epsilon: float = 1.0
     end_epsilon: float = 0.05
     epsilon_decay_steps: int = 100_000
     save_every_steps: int = 10_000
     max_training_steps: int = 500_000
-    min_replay_size: int = 1_000
+    min_replay_size: int = 500 #1_000
     device: str = "auto"
     checkpoint_dir: Optional[str] = None
     seed: Optional[int] = None
@@ -427,7 +429,7 @@ class DQNTrainer:
             if self.total_steps % self.config.train_frequency == 0:
                 loss = self._learn()
                 if loss is not None:
-                    metrics["loss"] = loss
+                    metrics["loss"] = float(loss)
             if self.total_steps % self.config.target_update_frequency == 0:
                 self._sync_target_network()
             if self.total_steps % self.config.save_every_steps == 0:
@@ -442,7 +444,40 @@ class DQNTrainer:
 
         self._update_epsilon()
 
+        try:
+            loss_value = metrics.get("loss") if metrics else float("nan")
+            reward_log = {
+                "kind": "REWARD_STEP",
+                "ts": self._utc_now(),
+                "total_steps": int(self.total_steps),
+                "training_steps": int(self.training_steps),
+                "step_reward": float(reward),
+                "epsilon": float(self.epsilon),
+                "buffer_size": int(len(self.replay_buffer)),
+                "running": bool(self.running),
+                "loss": float(loss_value) if loss_value is not None else float("nan"),
+                "episode_return_so_far": float(self.current_episode_return),
+                "episode_length_so_far": int(self.current_episode_length),
+            }
+            reward_logger.info(json.dumps(reward_log, separators=(",", ":")))
+        except Exception:  # pragma: no cover - defensive logging
+            logger.exception("Failed to log reward step")
+
         if done:
+            try:
+                episode_log = {
+                    "kind": "REWARD_EPISODE",
+                    "ts": self._utc_now(),
+                    "run_id": self._run_id,
+                    "total_steps": int(self.total_steps),
+                    "training_steps": int(self.training_steps),
+                    "episode_return": float(self.current_episode_return),
+                    "episode_length": int(self.current_episode_length),
+                    "epsilon_end": float(self.epsilon),
+                }
+                reward_logger.info(json.dumps(episode_log, separators=(",", ":")))
+            except Exception:  # pragma: no cover - defensive logging
+                logger.exception("Failed to log reward episode")
             self.reset_episode()
 
         return metrics
@@ -692,6 +727,10 @@ class DQNTrainer:
             "weights": weight_matrices,
             "max_weight": float(round(max_weight, 6)),
         }
+
+    @staticmethod
+    def _utc_now() -> str:
+        return datetime.utcnow().isoformat(timespec="seconds") + "Z"
 
 
 def available_agents() -> Dict[str, Dict[str, str]]:
