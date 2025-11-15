@@ -17,7 +17,7 @@ class Car {
         this.sensorsEnabled = true;
         this.trackImg = trackImg;
         this.offscreenCtx = offscreenCtx;
-        this.carImgScale = 0.4; // The scale factor used when drawing the car image
+        this.carImgScale = 0.2; // The scale factor used when drawing the car image
         this.actualWidth = width;
         this.actualHeight = height;
         this.carPolygon = []; // Will be set when car image is loaded
@@ -247,7 +247,7 @@ class Car {
         ctx.filter = this.damaged ? 'grayscale(100%)' : 'none';
         
         if (carImg.complete && carImg.naturalWidth > 0) {
-            ctx.drawImage(carImg, -(carImg.width / 2) * 0.4, -(carImg.height / 2) * 0.4, carImg.width * 0.4, carImg.height * 0.4);
+            ctx.drawImage(carImg, -(carImg.width / 2) * this.carImgScale, -(carImg.height / 2) * this.carImgScale, carImg.width * this.carImgScale, carImg.height * this.carImgScale);
         } else {
             ctx.fillStyle = this.damaged ? 'gray' : 'red';
             ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
