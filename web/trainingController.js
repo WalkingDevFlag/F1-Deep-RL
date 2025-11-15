@@ -805,13 +805,13 @@
 
             let penalty = 0;
 
-            if (moving || makingProgress) {
-                inactivity.idleDuration = 0;
-            } else {
+            if (!moving && !makingProgress) {
                 inactivity.idleDuration += dt;
                 if (inactivity.idleDuration > INACTIVITY_CONFIG.idleGracePeriod) {
                     penalty += -INACTIVITY_CONFIG.idlePenaltyRate * dt;
                 }
+            } else {
+                inactivity.idleDuration = 0;
             }
 
             const spawnPoint = this.spawnPoint;
@@ -827,15 +827,18 @@
                 }
             }
 
-            const idleNearSpawn = inSpawnRadius && !moving && !makingProgress;
-
-            if (idleNearSpawn) {
+            if (inSpawnRadius) {
                 inactivity.spawnDuration += dt;
                 if (inactivity.spawnDuration > INACTIVITY_CONFIG.spawnGracePeriod) {
                     penalty += -INACTIVITY_CONFIG.spawnPenaltyRate * dt;
                 }
             } else {
                 inactivity.spawnDuration = 0;
+            }
+
+            const maxFramePenalty = -Math.max(INACTIVITY_CONFIG.idlePenaltyRate, INACTIVITY_CONFIG.spawnPenaltyRate) * dt * 1.5;
+            if (penalty < maxFramePenalty) {
+                penalty = maxFramePenalty;
             }
 
             return penalty;
