@@ -29,9 +29,9 @@ class TrainingConfig:
     learning_rate: float = 1e-4
     train_frequency: int = 4
     target_update_frequency: int = 1_000
-    start_epsilon: float = 0.1
+    start_epsilon: float = 0.3
     end_epsilon: float = 0.05
-    epsilon_decay_steps: int = 10_000
+    epsilon_decay_steps: int = 100_000
     save_every_steps: int = 10_000
     max_training_steps: int = 500_000
     min_replay_size: int = 1_000
