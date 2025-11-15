@@ -540,6 +540,26 @@
 
             this.enqueueSample(sample);
 
+            if (done) {
+                try {
+                    const episodeLog = {
+                        kind: 'REWARD_EPISODE',
+                        ts: Date.now(),
+                        agent: this.selectedAgent,
+                        episode_reward: this.totalReward,
+                        episode_length: this.currentSteps || 0,
+                        reason: this.game && this.game.car && this.game.car.damaged ? 'crash' : 'done',
+                        metadata: {
+                            lapCount: this.game.lapCount || 0,
+                            checkpointIndex: checkpointMetrics.nextCheckpointIndex,
+                        },
+                    };
+                    console.info('REWARD_EPISODE', JSON.stringify(episodeLog));
+                } catch (e) {
+                    console.debug('Reward episode log failed', e);
+                }
+            }
+
             if (done && !this.pendingAutoReset) {
                 this.scheduleAutoReset();
             }
@@ -601,6 +621,26 @@
                 ? this.game.shouldRequestNeuralSnapshot()
                 : false;
             payload.include_snapshot = wantsSnapshot;
+
+            // --- Per-step reward log (client) ---
+            try {
+                const stepLog = {
+                    kind: 'REWARD_STEP',
+                    ts: Date.now(),
+                    agent: this.selectedAgent,
+                    step_total: this.currentSteps || 0,
+                    episode_reward: this.currentReward || 0,
+                    step_reward: sample.reward || 0,
+                    done: !!sample.done,
+                    reset: !!sample.reset,
+                    eps: this.currentEpsilon || 0,
+                    action: this.currentAction || 0,
+                    meta: sample.metadata || {},
+                };
+                console.info('REWARD_STEP', JSON.stringify(stepLog));
+            } catch (e) {
+                console.debug('Reward step log failed', e);
+            }
 
             const response = await fetch('/training/step', {
                 method: 'POST',
@@ -964,6 +1004,28 @@
             this.collisionSinceLastLap = false;
 
             if (this.enabled) {
+                const episodeReward = this.totalReward;
+                const episodeLength = this.currentSteps || 0;
+                if (!this.pendingAutoReset) {
+                    try {
+                        const episodeLog = {
+                            kind: 'REWARD_EPISODE',
+                            ts: Date.now(),
+                            agent: this.selectedAgent,
+                            episode_reward: episodeReward,
+                            episode_length: episodeLength,
+                            reason: 'manual_reset',
+                            metadata: {
+                                lapCount: this.game.lapCount || 0,
+                                checkpointIndex: this.checkpointState.nextIndex || 0,
+                            },
+                        };
+                        console.info('REWARD_EPISODE', JSON.stringify(episodeLog));
+                    } catch (e) {
+                        console.debug('Reward episode log failed', e);
+                    }
+                }
+
                 // Only send a reset to the trainer when initiated manually.
                 this.resetFlag = !this.pendingAutoReset;
                 this.previousStateVector = null;
