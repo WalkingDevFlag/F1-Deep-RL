@@ -5,6 +5,7 @@ import { applyLapTimingMixin } from './mixins/lapTiming.js';
 import { applyLoopMixin } from './mixins/loop.js';
 import { applyManualRewardMixin } from './mixins/manualReward.js';
 import { applyNeuralOverlayMixin } from './mixins/neuralOverlay.js';
+import { applyTrackManagerMixin } from './mixins/trackManager.js';
 
 class Game {
     constructor() {
@@ -66,5 +67,6 @@ applyManualRewardMixin(Game);
 applyHudMixin(Game);
 applyLapTimingMixin(Game);
 applyLoopMixin(Game);
+applyTrackManagerMixin(Game);
 
 export default Game;

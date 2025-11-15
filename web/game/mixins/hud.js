@@ -1,4 +1,5 @@
 import { openEditorModal } from '../editorModal.js';
+import { openTrackSelectorModal } from '../trackSelector.js';
 
 export function applyHudMixin(Game) {
     Game.prototype.setupUI = function setupUI() {
@@ -49,6 +50,8 @@ export function applyHudMixin(Game) {
         };
 
         const toggleUIIcon = createPngIcon('eye-open');
+        const levelEditorIcon = createPngIcon('edit');
+        const trackSelectIcon = createPngIcon('flag');
 
         const hudCard = createCard({ title: 'Driver Console', overlay: true });
         hudCard.element.setAttribute('aria-label', 'Driver control panel');
@@ -124,6 +127,7 @@ export function applyHudMixin(Game) {
         let dockElementRef = null;
         let homeButtonRef = null;
         let levelEditorButtonRef = null;
+        let trackSelectButtonRef = null;
         let toggleUIButtonRef = null;
         let dockShouldDetach = false;
 
@@ -133,6 +137,7 @@ export function applyHudMixin(Game) {
             dockShouldDetach = false;
             homeButtonRef = staticDock.querySelector('[data-dock-action="home"]');
             levelEditorButtonRef = staticDock.querySelector('[data-dock-action="editor"]');
+            trackSelectButtonRef = staticDock.querySelector('[data-dock-action="select-track"]');
             toggleUIButtonRef = staticDock.querySelector('[data-dock-action="toggle-ui"]');
 
             if (homeButtonRef) {
@@ -165,14 +170,6 @@ export function applyHudMixin(Game) {
                     window.location.href = '/';
                 }
             });
-            const toggleUIButton = createDockButton({
-                label: 'Hide UI',
-                tooltip: 'Toggle UI visibility',
-                icon: toggleUIIcon,
-                onClick: () => {
-                    this.toggleUI();
-                }
-            });
             const levelEditorButton = createDockButton({
                 label: 'Level Editor',
                 tooltip: 'Open Level Editor',
@@ -181,8 +178,29 @@ export function applyHudMixin(Game) {
                     openEditorModal();
                 }
             });
+            const trackSelectButton = createDockButton({
+                label: 'Tracks',
+                tooltip: 'Select Track',
+                icon: trackSelectIcon,
+                onClick: () => {
+                    openTrackSelectorModal({ returnFocus: trackSelectButton.element });
+                }
+            });
+            const toggleUIButton = createDockButton({
+                label: 'Hide UI',
+                tooltip: 'Toggle UI visibility',
+                icon: toggleUIIcon,
+                onClick: () => {
+                    this.toggleUI();
+                }
+            });
 
-            dock.addMany([homeButton, levelEditorButton, toggleUIButton]);
+            if (trackSelectButton.element) {
+                trackSelectButton.element.dataset.dockAction = 'select-track';
+                trackSelectButton.element.dataset.trackSelectorBound = 'true';
+            }
+
+            dock.addMany([homeButton, levelEditorButton, trackSelectButton, toggleUIButton]);
             if (document.body) {
                 document.body.appendChild(dock.element);
             }
@@ -191,6 +209,7 @@ export function applyHudMixin(Game) {
             homeButtonRef = homeButton.element;
             toggleUIButtonRef = toggleUIButton.element;
             levelEditorButtonRef = levelEditorButton.element;
+            trackSelectButtonRef = trackSelectButton.element;
             dockShouldDetach = true;
         }
 
@@ -212,6 +231,7 @@ export function applyHudMixin(Game) {
                 homeButton: homeButtonRef,
                 toggleUIButton: toggleUIButtonRef,
                 levelEditorButton: levelEditorButtonRef,
+                trackSelectButton: trackSelectButtonRef,
                 detachOnReset: dockShouldDetach
             }
         };

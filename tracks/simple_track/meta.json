@@ -1,0 +1,9 @@
+{
+  "id": "simple_track",
+  "name": "Simple Track",
+  "author": "WalkingDevFlag",
+  "original": "original.png",
+  "canonical": "canonical.png",
+  "geometry": "geometry.json",
+  "createdAt": "2025-11-15T12:15:58.815006Z"
+}

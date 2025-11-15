@@ -25,6 +25,13 @@
                 <span class="ui-dock__label">Level Editor</span>
                 <span class="ui-dock__tooltip">Level Editor</span>
             </button>
+            <button type="button" class="ui-dock__button" data-dock-action="select-track" aria-label="Select Track">
+                <span class="ui-dock__icon" aria-hidden="true">
+                    <img src="ui/icons/flag.png" alt="" width="24" height="24">
+                </span>
+                <span class="ui-dock__label">Tracks</span>
+                <span class="ui-dock__tooltip">Select Track</span>
+            </button>
             <button type="button" class="ui-dock__button" data-dock-action="toggle-ui" aria-label="Toggle UI visibility">
                 <span class="ui-dock__icon" aria-hidden="true">
                     <img src="ui/icons/eye-open.png" alt="" width="24" height="24">
@@ -46,6 +53,20 @@
                     <button type="button" class="editor-modal__action editor-modal__action--secondary" data-editor-action="upload">Upload New Track</button>
                 </div>
                 <p class="editor-modal__hint">Bring your best racing lines&mdash;the track builder is warming up.</p>
+            </div>
+        </section>
+    </div>
+
+    <div id="track-selector-modal" class="editor-modal" role="dialog" aria-modal="true" aria-labelledby="track-selector-modal-title" aria-hidden="true" hidden>
+        <section class="ui-card editor-modal__content" role="document" tabindex="-1">
+            <button type="button" class="editor-modal__close" aria-label="Close track selector" data-track-selector-close>&times;</button>
+            <h2 class="ui-card__title" id="track-selector-modal-title">Select a Track</h2>
+            <div class="ui-card__body">
+                <p class="editor-modal__lead">Choose a circuit to load into the simulator.</p>
+                <div class="editor-load__error" data-track-selector-error hidden></div>
+                <div class="editor-load__list" data-track-selector-list>
+                    <div class="editor-load__loading">Loading tracks...</div>
+                </div>
             </div>
         </section>
     </div>
