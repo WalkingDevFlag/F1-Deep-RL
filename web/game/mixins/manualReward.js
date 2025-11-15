@@ -15,19 +15,19 @@ const MANUAL_POLICY_KEYS = Object.keys(MANUAL_POLICY_LABELS);
 const DEFAULT_DT = 0.016;
 
 const SPEED_CONFIG = {
-    forwardScale: 5.5,
-    timePenaltyScale: -0.5,
-    reversePenaltyScale: -6
+    forwardScale: 1.0,
+    timePenaltyScale: -0.02,
+    reversePenaltyScale: -1.0
 };
 
 const INACTIVITY_CONFIG = {
     speedThreshold: 2,
     progressThreshold: 0.0005,
     idleGracePeriod: 1.5,
-    idlePenaltyRate: 4,
+    idlePenaltyRate: 0.2,
     spawnRadius: 320,
     spawnGracePeriod: 4,
-    spawnPenaltyRate: 6,
+    spawnPenaltyRate: 0.5,
     spawnProgressExit: 0.02,
     postResetGracePeriod: 1.5
 };
@@ -316,7 +316,7 @@ export function applyManualRewardMixin(Game) {
 
         let checkpointReward = 0;
         if (distance <= captureRadius) {
-            checkpointReward = 11;
+            checkpointReward = 1.0;
             state.totalCleared += 1;
             state.nextIndex = (nextIndex + 1) % total;
         } else {
@@ -344,12 +344,12 @@ export function applyManualRewardMixin(Game) {
         let reward = 0;
 
         if (delta > 0) {
-            reward += delta * 22;
+            reward += delta * 5.0;
         } else if (delta < 0) {
             if ((this.lapCount || 0) > tracker.prevLapCount) {
                 reward += 0;
             } else {
-                reward += delta * 5;
+                reward += delta * 1.5;
             }
         }
 
@@ -371,9 +371,9 @@ export function applyManualRewardMixin(Game) {
             state.distanceNorm = 1;
             state.progressWithinLap = 0;
 
-            let reward = delta * 55;
+            let reward = delta * 10;
             if (!tracker.collisionSinceLastLap) {
-                reward += 22;
+                reward += 2;
             }
             tracker.collisionSinceLastLap = false;
             return reward;
@@ -426,7 +426,7 @@ export function applyManualRewardMixin(Game) {
         const tracker = this.manualReward;
         if (this.car && this.car.damaged && !tracker.prevDamaged) {
             tracker.collisionSinceLastLap = true;
-            return -20;
+            return -5;
         }
         return 0;
     };
@@ -458,16 +458,15 @@ export function applyManualRewardMixin(Game) {
         const absProgressDelta = Math.abs(progressDelta || 0);
         const moving = speed > INACTIVITY_CONFIG.speedThreshold;
         const makingProgress = absProgressDelta > INACTIVITY_CONFIG.progressThreshold;
-        let stalledPenalty = 0;
-        let spawnPenalty = 0;
 
-        if (moving || makingProgress) {
-            inactivity.idleDuration = 0;
-        } else {
+        let stalledPenalty = 0;
+        if (!moving && !makingProgress) {
             inactivity.idleDuration += dt;
             if (inactivity.idleDuration > INACTIVITY_CONFIG.idleGracePeriod) {
-                stalledPenalty = -INACTIVITY_CONFIG.idlePenaltyRate * dt;
+                stalledPenalty += -INACTIVITY_CONFIG.idlePenaltyRate * dt;
             }
+        } else {
+            inactivity.idleDuration = 0;
         }
 
         const spawnPoint = tracker.spawnPoint;
@@ -483,17 +482,27 @@ export function applyManualRewardMixin(Game) {
             }
         }
 
-        const idleNearSpawn = inSpawnRadius && !moving && !makingProgress;
-
-        if (idleNearSpawn) {
+        let spawnPenalty = 0;
+        if (inSpawnRadius) {
             inactivity.spawnDuration += dt;
             if (inactivity.spawnDuration > INACTIVITY_CONFIG.spawnGracePeriod) {
-                spawnPenalty = -INACTIVITY_CONFIG.spawnPenaltyRate * dt;
+                spawnPenalty += -INACTIVITY_CONFIG.spawnPenaltyRate * dt;
             }
         } else {
             inactivity.spawnDuration = 0;
         }
 
-        return { stalledPenalty, spawnPenalty };
+        const maxFramePenalty = -Math.max(INACTIVITY_CONFIG.idlePenaltyRate, INACTIVITY_CONFIG.spawnPenaltyRate) * dt * 1.5;
+        const combined = stalledPenalty + spawnPenalty;
+        if (combined < maxFramePenalty) {
+            const scale = maxFramePenalty / Math.min(-1e-6, combined);
+            stalledPenalty *= scale;
+            spawnPenalty *= scale;
+        }
+
+        return {
+            stalledPenalty,
+            spawnPenalty
+        };
     };
 }
