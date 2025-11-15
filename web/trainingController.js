@@ -500,17 +500,22 @@
             let reward = 0;
 
             if (prevState) {
-                reward += checkpointMetrics.checkpointReward;
-                reward += this.computeProgressDelta(checkpointMetrics.progressWithinLap);
-                reward += this.computeLapReward();
-                reward += this.computeSpeedReward(deltaTime);
-                reward += this.computeSmoothDrivingReward(deltaTime);
-                reward += this.computeCollisionPenalty();
-                reward += this.computeInactivityPenalty({
-                    deltaTime,
-                    progressDelta,
-                    progressWithinLap: checkpointMetrics.progressWithinLap
-                });
+                const episodicReward =
+                    checkpointMetrics.checkpointReward +
+                    this.computeLapReward() +
+                    this.computeCollisionPenalty();
+
+                const continuousReward =
+                    this.computeProgressDelta(checkpointMetrics.progressWithinLap) +
+                    this.computeSpeedReward(deltaTime) +
+                    this.computeSmoothDrivingReward(deltaTime) +
+                    this.computeInactivityPenalty({
+                        deltaTime,
+                        progressDelta,
+                        progressWithinLap: checkpointMetrics.progressWithinLap
+                    });
+
+                reward += episodicReward + continuousReward;
             }
 
             // Update current reward
