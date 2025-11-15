@@ -202,7 +202,7 @@ class TrainerService:
 
 
 TRAINING_CONFIG = TrainingConfig(
-    state_size=19,
+    state_size=17,
     action_size=7,
     replay_buffer_size=100_000,
     batch_size=64,
@@ -214,6 +214,7 @@ TRAINING_CONFIG = TrainingConfig(
     max_training_steps=1_000_000,
     resume_mode="fresh",
     single_run_mode=True,
+    min_replay_size=500,
 )
 
 trainer_service = TrainerService(TRAINING_CONFIG)

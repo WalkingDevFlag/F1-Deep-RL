@@ -103,7 +103,7 @@
             this.currentAction = 0;
             this.previousStateVector = null;
             this.resetFlag = false;
-            this.stateSize = 19;
+            this.stateSize = 17;
             this.actionSize = 7;
             this.prevLapCount = 0;
             this.prevProgressWithinLap = 0;
@@ -868,9 +868,6 @@
             const distanceNorm = this.checkpointState.distanceNorm ?? 1;
             const progressWithinLap = this.checkpointState.progressWithinLap ?? 0;
 
-            const lapTimeMs = this.currentLapTimeMs();
-            const lapTimeNorm = Math.min(lapTimeMs / 120000, 1);
-            const lapCountNorm = Math.min((this.game.lapCount || 0) / 10, 1);
             const collisionFlag = this.game.car.damaged ? 1 : 0;
 
             const state = [
@@ -880,10 +877,9 @@
                 Math.cos(car.angle || 0),
                 progressWithinLap,
                 distanceNorm,
-                lapTimeNorm,
-                lapCountNorm,
                 collisionFlag,
             ];
+            // 17 features total once flattened to Float32Array
 
             return Float32Array.from(state);
         }
