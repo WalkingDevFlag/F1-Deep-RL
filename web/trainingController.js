@@ -518,13 +518,14 @@
             this.totalReward += reward;
 
             const done = !!this.game.car.damaged;
+            const sendReset = (!done && this.resetFlag) ? true : false;
             const sample = {
                 state: stateVector,
                 prev_state: prevState,
                 prev_action: prevAction,
                 reward: prevState ? reward : 0,
-                done,
-                reset: this.resetFlag,
+                done: !!done,
+                reset: sendReset,
                 metadata: {
                     lapCount: this.game.lapCount || 0,
                     lapTimeMs: this.currentLapTimeMs(),
@@ -957,7 +958,8 @@
             this.prevDamaged = false;
             this.prevSteeringAngle = this.game.car ? this.game.car.angle || 0 : 0;
             this.collisionSinceLastLap = false;
-            if (this.enabled) {
+            if (this.enabled && !this.pendingAutoReset) {
+                // Mark manual resets so the trainer can start a fresh episode without mixing done + reset frames.
                 this.resetFlag = true;
                 this.previousStateVector = null;
                 this.prevProgressWithinLap = 0;
