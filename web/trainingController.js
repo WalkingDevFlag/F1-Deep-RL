@@ -68,19 +68,19 @@
     };
 
     const SPEED_CONFIG = {
-        forwardScale: 5.5,
-        timePenaltyScale: -0.5,
-        reversePenaltyScale: -6
+        forwardScale: 1.0,
+        timePenaltyScale: -0.02,
+        reversePenaltyScale: -1.0
     };
 
     const INACTIVITY_CONFIG = {
         speedThreshold: 2,
         progressThreshold: 0.0005,
         idleGracePeriod: 1.5,
-        idlePenaltyRate: 4,
+        idlePenaltyRate: 0.2,
         spawnRadius: 320,
         spawnGracePeriod: 4,
-        spawnPenaltyRate: 6,
+        spawnPenaltyRate: 0.5,
         spawnProgressExit: 0.02,
         postResetGracePeriod: 1.5
     };
@@ -675,7 +675,7 @@
             let checkpointReward = 0;
 
             if (distance <= captureRadius) {
-                checkpointReward = 11;
+                checkpointReward = 1.0;
                 this.checkpointState.totalCleared += 1;
                 this.checkpointState.nextIndex = (nextIndex + 1) % total;
             } else {
@@ -700,14 +700,14 @@
             const delta = progressWithinLap - this.prevProgressWithinLap;
             let reward = 0;
             if (delta > 0) {
-                reward += delta * 22;
+                reward += delta * 5.0;
             } else if (delta < -0.5 && this.resetFlag) {
                 reward += 0;
             } else if (delta < 0) {
                 if (this.game && this.game.lapCount > this.prevLapCount) {
                     reward += 0;
                 } else {
-                    reward += delta * 5;
+                    reward += delta * 1.5;
                 }
             }
             this.prevProgressWithinLap = Math.max(0, progressWithinLap);
@@ -724,9 +724,9 @@
                 this.checkpointState.nextIndex = 0;
                 this.checkpointState.distanceNorm = 1;
                 this.checkpointState.progressWithinLap = 0;
-                let reward = delta * 55;
+                let reward = delta * 10;
                 if (!this.collisionSinceLastLap) {
-                    reward += 22;
+                    reward += 2;
                 }
                 this.collisionSinceLastLap = false;
                 return reward;
@@ -773,7 +773,7 @@
         computeCollisionPenalty() {
             if (this.game.car && this.game.car.damaged && !this.prevDamaged) {
                 this.collisionSinceLastLap = true;
-                return -20;
+                return -5;
             }
             return 0;
         }
