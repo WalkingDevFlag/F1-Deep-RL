@@ -129,4 +129,8 @@ class Sensor {
             }
         }
     }
+
+    getNormalizedOffsets() {
+        return this.readings.map(reading => reading ? 1 - reading.offset : 0);
+    }
 }

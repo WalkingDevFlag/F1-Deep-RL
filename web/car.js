@@ -17,7 +17,7 @@ class Car {
         this.sensorsEnabled = true;
         this.trackImg = trackImg;
         this.offscreenCtx = offscreenCtx;
-        this.carImgScale = 0.05; // The scale factor used when drawing the car image
+        this.carImgScale = 0.4; // The scale factor used when drawing the car image
         this.actualWidth = width;
         this.actualHeight = height;
         this.carPolygon = []; // Will be set when car image is loaded
@@ -277,6 +277,16 @@ class Car {
             this.sensor = null;
         }
         console.log('Car reset to spawn point:', spawnPoint);
+    }
+
+    getState() {
+        const offsets = this.sensor ? this.sensor.getNormalizedOffsets() : [];
+        return {
+            offsets,
+            speed: this.speed / this.maxSpeed, // Normalize speed to -1 to 1
+            damage: this.damaged ? 1 : 0,
+            heading: this.angle / Math.PI // Normalize angle to -1 to 1
+        };
     }
 }
 
