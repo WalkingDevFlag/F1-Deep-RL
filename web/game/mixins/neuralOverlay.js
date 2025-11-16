@@ -18,7 +18,7 @@ export function applyNeuralOverlayMixin(Game) {
             this.initializeNeuralOverlay();
         }
         if (this.neuralOverlay) {
-            this.neuralOverlay.setVisible(this.neuralNetworkVisible);
+            this.neuralOverlay.setVisible(false); // Disabled functionality
             if (!this.neuralNetworkVisible) {
                 this.neuralOverlay.markStale();
             }
